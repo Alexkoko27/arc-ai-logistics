@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import MapView from "@/components/MapView";
+import { cargoLocation, truckLocation } from "@/lib/routeData";
 
 type AiAnalysis = {
   recommendation?: string;
@@ -18,6 +19,8 @@ type AnalysisResponse = {
   driverCost: number;
   profit: number;
   decision: string;
+  routeSource?: string;
+  encodedPolyline?: string | null;
   ai: AiAnalysis | string;
 };
 
@@ -31,6 +34,23 @@ type PaymentResponse = {
   walletAddress?: string;
   explorer?: string;
 };
+
+function formatCoordinate(value: number) {
+  return value.toFixed(4);
+}
+
+function formatAiAnalysis(ai: AiAnalysis | string) {
+  if (typeof ai === "string") return ai;
+
+  return [
+    ai.recommendation && `Recommendation: ${ai.recommendation}`,
+    typeof ai.confidence === "number" && `Confidence: ${ai.confidence}%`,
+    ai.reason && `Reason: ${ai.reason}`,
+    ai.source && `Source: ${ai.source}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 export default function Home() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
@@ -53,64 +73,95 @@ export default function Home() {
 
   return (
     <main className="p-8 space-y-6">
-      <h1 className="text-3xl font-bold">Arc AI Logistics Demo</h1>
+      <header className="space-y-2">
+        <p className="text-sm uppercase tracking-wide text-gray-500">
+          Arc Testnet logistics MVP
+        </p>
+        <h1 className="text-3xl font-bold">Arc AI Logistics Demo</h1>
+      </header>
+
       <MapView />
 
-      {/* === AGENTS CHAIN === */}
-      <div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-        suppressHydrationWarning
-      >
-        <div className="border border-blue-500 p-4 rounded-xl">
-          <h3 className="font-bold text-blue-600">🚛 Truck GPS Agent</h3>
-          <p className="text-sm mt-2">Current Truck Location</p>
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="border border-blue-500 p-4 rounded-xl space-y-2">
+          <h3 className="font-bold text-blue-600">Truck GPS Agent</h3>
+          <p className="text-sm text-gray-600">Current truck location</p>
+          <div className="text-sm space-y-1">
+            <p>{truckLocation.city}</p>
+            <p>
+              {formatCoordinate(truckLocation.lat)}, {formatCoordinate(truckLocation.lng)}
+            </p>
+          </div>
         </div>
 
-        <div className="border border-green-500 p-4 rounded-xl">
-          <h3 className="font-bold text-green-600">📦 Cargo Location Agent</h3>
-          <p className="text-sm mt-2">Cargo Current Location</p>
+        <div className="border border-green-500 p-4 rounded-xl space-y-2">
+          <h3 className="font-bold text-green-600">Cargo Location Agent</h3>
+          <p className="text-sm text-gray-600">Cargo pickup location</p>
+          <div className="text-sm space-y-1">
+            <p>{cargoLocation.city}</p>
+            <p>
+              {formatCoordinate(cargoLocation.lat)}, {formatCoordinate(cargoLocation.lng)}
+            </p>
+          </div>
         </div>
 
-        <div className="border border-amber-500 p-4 rounded-xl">
-          <h3 className="font-bold text-amber-600">📊 Route Economics Agent</h3>
-          <p className="text-sm mt-2">Route Economics</p>
-          {analysis && (
-            <div className="text-sm mt-2 space-y-1">
+        <div className="border border-amber-500 p-4 rounded-xl space-y-2">
+          <h3 className="font-bold text-amber-600">Route Economics Agent</h3>
+          <p className="text-sm text-gray-600">Route economics</p>
+          {analysis ? (
+            <div className="text-sm space-y-1">
               <p>Distance: {analysis.distance} km</p>
               <p>ETA: {analysis.eta}</p>
               <p>Profit: ${analysis.profit}</p>
+              <p>Source: {analysis.routeSource ?? "unknown"}</p>
             </div>
+          ) : (
+            <p className="text-sm text-gray-500">Loading analysis...</p>
           )}
         </div>
 
-        <div className="border border-purple-500 p-4 rounded-xl lg:col-span-2">
-          <h3 className="font-bold text-purple-600">🤖 AI Decision Agent</h3>
-          <p className="text-sm mt-2">AI Recommendation</p>
-          {analysis && (
-            <pre className="text-sm bg-gray-100 p-3 rounded mt-2 overflow-auto">
-              {typeof analysis.ai === "string"
-                ? analysis.ai
-                : JSON.stringify(analysis.ai, null, 2)}
+        <div className="border border-purple-500 p-4 rounded-xl lg:col-span-2 space-y-2">
+          <h3 className="font-bold text-purple-600">AI Decision Agent</h3>
+          <p className="text-sm text-gray-600">AI recommendation</p>
+          {analysis ? (
+            <pre className="text-sm bg-gray-100 p-3 rounded overflow-auto whitespace-pre-wrap">
+              {formatAiAnalysis(analysis.ai)}
             </pre>
+          ) : (
+            <p className="text-sm text-gray-500">Waiting for route economics...</p>
           )}
         </div>
 
-        <div className="border border-emerald-500 p-4 rounded-xl">
-          <h3 className="font-bold text-emerald-600">💰 Payment Agent</h3>
-          <p className="text-sm mt-2">Payment & Transaction</p>
-          {payment && (
-            <div className="text-sm mt-2 space-y-1">
+        <div className="border border-emerald-500 p-4 rounded-xl space-y-2">
+          <h3 className="font-bold text-emerald-600">Payment Agent</h3>
+          <p className="text-sm text-gray-600">Circle and Arc payment status</p>
+          {payment ? (
+            <div className="text-sm space-y-1 break-words">
               <p>Success: {String(payment.success)}</p>
-              {payment.txHash && <p>Tx: {payment.txHash}</p>}
+              {payment.network && <p>Network: {payment.network}</p>}
+              {payment.chainId && <p>Chain ID: {payment.chainId}</p>}
               {payment.status && <p>Status: {payment.status}</p>}
+              {payment.txHash && <p>Tx: {payment.txHash}</p>}
               {payment.walletAddress && <p>Wallet: {payment.walletAddress}</p>}
+              {payment.explorer && (
+                <a
+                  className="text-emerald-700 underline"
+                  href={payment.explorer}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open Arc explorer
+                </a>
+              )}
             </div>
+          ) : (
+            <p className="text-sm text-gray-500">Not reserved yet.</p>
           )}
         </div>
-      </div>
+      </section>
 
       {analysis && (
-        <div className="border p-4 rounded-xl space-y-1">
+        <section className="border p-4 rounded-xl space-y-1">
           <h2 className="font-bold">AI Analysis</h2>
 
           <p>Distance: {analysis.distance} km</p>
@@ -124,12 +175,10 @@ export default function Home() {
             <strong> {analysis.decision}</strong>
           </p>
 
-          <pre className="text-sm bg-gray-100 p-3 rounded overflow-auto">
-            {typeof analysis.ai === "string"
-              ? analysis.ai
-              : JSON.stringify(analysis.ai, null, 2)}
+          <pre className="text-sm bg-gray-100 p-3 rounded overflow-auto whitespace-pre-wrap">
+            {formatAiAnalysis(analysis.ai)}
           </pre>
-        </div>
+        </section>
       )}
 
       <button
