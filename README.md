@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Arc AI Logistics
 
-## Getting Started
+A Next.js demo dApp for AI-assisted logistics on Arc Testnet. The app shows a simple agent chain:
 
-First, run the development server:
+- Truck GPS Agent: provides the truck origin coordinates.
+- Cargo Location Agent: provides the cargo pickup coordinates.
+- Route Economics Agent: calculates distance, ETA, costs, and expected profit.
+- AI Decision Agent: uses Gemini when configured, with a local fallback rule.
+- Payment Agent: prepares the Circle/Arc wallet payment flow.
+
+The current project is an MVP scaffold. Google Routes and Gemini can be real when API keys are configured. Circle/Arc payment is currently prepared around a developer-controlled wallet and is ready for the next step: a real USDC transfer or smart contract call.
+
+## Requirements
+
+- Node.js 20+
+- npm
+- Google Maps JavaScript API key
+- Google Routes API server key
+- Gemini API key
+- Circle developer-controlled wallets API key and entity secret
+
+## Setup
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create local environment variables:
+
+```bash
+cp .env.example .env.local
+```
+
+Fill `.env.local`. Do not commit `.env.local`; it is protected by `.gitignore`.
+
+Arc Testnet defaults are already documented in `.env.example`:
+
+```env
+ARC_RPC_URL=https://rpc.testnet.arc.network
+ARC_CHAIN_ID=5042002
+ARC_EXPLORER_URL=https://testnet.arcscan.app
+```
+
+## Development
+
+Run the app locally:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run checks:
 
-## Learn More
+```bash
+npm run lint
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Circle Wallet Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+After adding `CIRCLE_API_KEY` and `CIRCLE_ENTITY_SECRET` to `.env.local`, create an Arc Testnet wallet:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run create:circle-wallet
+```
 
-## Deploy on Vercel
+Copy the returned wallet set id, wallet id, and wallet address into `.env.local`:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```env
+CIRCLE_WALLET_SET_ID=
+CIRCLE_WALLET_ID=
+CIRCLE_WALLET_ADDRESS=
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Then fund the wallet with Arc Testnet USDC using the Circle faucet.
+
+## Project Structure
+
+```text
+app/page.tsx                 Main demo UI and agent status panels
+app/api/analyze/route.ts     Route metrics, economics, and AI analysis endpoint
+app/api/pay/route.ts         Circle/Arc payment preparation endpoint
+components/MapView.tsx       Google Maps display
+lib/googleRoutes.ts          Google Routes API integration with fallback
+lib/gemini.ts                Gemini analysis with fallback
+lib/profit.ts                Route profitability calculation
+lib/routeData.ts             Demo truck and cargo coordinates
+scripts/create-circle-wallet.ts
+```
+
+## Notes
+
+- `.env.example` is safe to commit.
+- `.env.local` must stay private.
+- If Google Routes is not configured, `/api/analyze` falls back to Berlin to Hamburg demo values.
+- If Gemini is not configured or fails, the AI decision falls back to a local profit rule.
