@@ -161,13 +161,6 @@ export default function Home() {
   );
 
   useEffect(() => {
-    setRun(null);
-    setPayment(null);
-    setPaymentStatus(null);
-    setError(null);
-  }, [selectedShipmentId]);
-
-  useEffect(() => {
     if (!payment?.transactionId || paymentStatus?.terminal) return;
 
     const timer = window.setInterval(() => {
@@ -181,6 +174,14 @@ export default function Home() {
 
     return () => window.clearInterval(timer);
   }, [payment?.transactionId, paymentStatus?.terminal]);
+
+  function selectShipment(shipmentId: string) {
+    setSelectedShipmentId(shipmentId);
+    setRun(null);
+    setPayment(null);
+    setPaymentStatus(null);
+    setError(null);
+  }
 
   async function runAgents() {
     if (!selectedShipmentId) return;
@@ -259,7 +260,7 @@ export default function Home() {
                   name="shipment"
                   value={shipment.id}
                   checked={selectedShipmentId === shipment.id}
-                  onChange={() => setSelectedShipmentId(shipment.id)}
+                  onChange={() => selectShipment(shipment.id)}
                 />
                 <span className="font-semibold">{shipment.reference}</span>
                 <div className="mt-2 text-sm text-gray-600 space-y-1">
