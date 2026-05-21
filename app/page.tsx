@@ -1,201 +1,417 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MapView from "@/components/MapView";
-import { cargoLocation, truckLocation } from "@/lib/routeData";
 
-type AiAnalysis = {
-  recommendation?: string;
-  confidence?: number;
-  reason?: string;
-  source?: string;
+type Coordinates = {
+  lat: number;
+  lng: number;
+  city: string;
+  country: string;
 };
 
-type AnalysisResponse = {
-  distance: number;
-  eta: string;
+type Vehicle = {
+  id: string;
+  label: string;
+  driver: string;
+  equipment: string;
+  status: string;
+  location: Coordinates;
+  preferredLane: string;
+  hoursUntilAvailable: number;
+  costPerKm: number;
+};
+
+type Shipment = {
+  id: string;
+  reference: string;
+  status: string;
+  origin: Coordinates;
+  destination: Coordinates;
+  commodity: string;
+  weightKg: number;
   revenue: number;
-  fuelCost: number;
-  driverCost: number;
-  profit: number;
-  decision: string;
-  routeSource?: string;
-  encodedPolyline?: string | null;
-  ai: AiAnalysis | string;
+  currency: "USDC" | "EURC";
+  pickupWindow: string;
+};
+
+type AgentResult = {
+  name: string;
+  status: "complete" | "warning";
+  summary: string;
+  details: Record<string, string | number | boolean>;
+};
+
+type AgentRun = {
+  id: string;
+  vehicle: Vehicle;
+  shipment: Shipment;
+  agents: AgentResult[];
+  economics: {
+    distanceKm: number;
+    eta: string;
+    revenue: number;
+    operatingCost: number;
+    grossProfit: number;
+    marginPercent: number;
+    currency: "USDC" | "EURC";
+    routeSource: string;
+  };
+  risk: {
+    level: "low" | "medium" | "high";
+    score: number;
+    factors: string[];
+  };
+  recommendation: {
+    decision: "BOOK" | "WAIT" | "SKIP";
+    confidence: number;
+    reason: string;
+    source: string;
+  };
+  payment: {
+    feeAmount: string;
+    feeCurrency: "USDC";
+    status: string;
+  };
+};
+
+type DemoDataResponse = {
+  vehicles: Vehicle[];
+  shipments: Shipment[];
+  agentFee: {
+    amount: string;
+    currency: "USDC";
+    network: string;
+  };
 };
 
 type PaymentResponse = {
+  transactionId: string;
+  state: string;
+  txHash: string | null;
+  amount: string;
+  currency: "USDC";
+  sourceWalletAddress: string;
+  destinationAddress: string;
+  network: string;
+  blockchain: string;
+  tokenAddress: string;
+  explorerBaseUrl: string;
+};
+
+type AgentRunResponse = {
   success: boolean;
-  txHash?: string;
-  status?: string;
   message?: string;
-  network?: string;
-  chainId?: string;
-  walletAddress?: string;
-  explorer?: string;
+  run?: AgentRun;
+  payment?: PaymentResponse;
+};
+
+type PaymentStatusResponse = {
+  success: boolean;
+  status?: {
+    transactionId: string;
+    state: string;
+    txHash: string | null;
+    terminal: boolean;
+    explorerUrl: string;
+  };
+  message?: string;
 };
 
 function formatCoordinate(value: number) {
   return value.toFixed(4);
 }
 
-function formatAiAnalysis(ai: AiAnalysis | string) {
-  if (typeof ai === "string") return ai;
+function formatLocation(location: Coordinates) {
+  return `${location.city}, ${location.country}`;
+}
 
-  return [
-    ai.recommendation && `Recommendation: ${ai.recommendation}`,
-    typeof ai.confidence === "number" && `Confidence: ${ai.confidence}%`,
-    ai.reason && `Reason: ${ai.reason}`,
-    ai.source && `Source: ${ai.source}`,
-  ]
-    .filter(Boolean)
+function formatDetails(details: AgentResult["details"]) {
+  return Object.entries(details)
+    .map(([key, value]) => `${key}: ${String(value)}`)
     .join("\n");
 }
 
 export default function Home() {
-  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [demoData, setDemoData] = useState<DemoDataResponse | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
+  const [selectedShipmentId, setSelectedShipmentId] = useState("");
+  const [run, setRun] = useState<AgentRun | null>(null);
   const [payment, setPayment] = useState<PaymentResponse | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<
+    PaymentStatusResponse["status"] | null
+  >(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/analyze")
+    fetch("/api/demo-data")
       .then((r) => r.json())
-      .then((data: AnalysisResponse) => setAnalysis(data));
+      .then((data: DemoDataResponse) => {
+        setDemoData(data);
+        setSelectedVehicleId(data.vehicles[0]?.id ?? "");
+        setSelectedShipmentId(data.shipments[0]?.id ?? "");
+      })
+      .catch(() => setError("Unable to load dispatcher demo data."));
   }, []);
 
-  async function reserve() {
-    const r = await fetch("/api/pay", {
-      method: "POST",
-    });
+  const selectedVehicle = useMemo(
+    () =>
+      demoData?.vehicles.find((vehicle) => vehicle.id === selectedVehicleId) ??
+      null,
+    [demoData, selectedVehicleId],
+  );
 
-    const data = (await r.json()) as PaymentResponse;
-    setPayment(data);
+  const selectedShipment = useMemo(
+    () =>
+      demoData?.shipments.find(
+        (shipment) => shipment.id === selectedShipmentId,
+      ) ?? null,
+    [demoData, selectedShipmentId],
+  );
+
+  useEffect(() => {
+    if (!payment?.transactionId || paymentStatus?.terminal) return;
+
+    const timer = window.setInterval(() => {
+      fetch(`/api/pay/status?id=${payment.transactionId}`)
+        .then((r) => r.json())
+        .then((data: PaymentStatusResponse) => {
+          if (data.status) setPaymentStatus(data.status);
+        })
+        .catch(() => undefined);
+    }, 4000);
+
+    return () => window.clearInterval(timer);
+  }, [payment?.transactionId, paymentStatus?.terminal]);
+
+  async function runAgents() {
+    if (!selectedVehicleId || !selectedShipmentId) return;
+
+    setIsRunning(true);
+    setError(null);
+    setRun(null);
+    setPayment(null);
+    setPaymentStatus(null);
+
+    try {
+      const response = await fetch("/api/agent-runs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          vehicleId: selectedVehicleId,
+          shipmentId: selectedShipmentId,
+        }),
+      });
+      const data = (await response.json()) as AgentRunResponse;
+
+      if (!response.ok || !data.success || !data.run || !data.payment) {
+        throw new Error(data.message ?? "Paid agent run failed.");
+      }
+
+      setRun(data.run);
+      setPayment(data.payment);
+      setPaymentStatus({
+        transactionId: data.payment.transactionId,
+        state: data.payment.state,
+        txHash: data.payment.txHash,
+        terminal: false,
+        explorerUrl: data.payment.txHash
+          ? `${data.payment.explorerBaseUrl}/tx/${data.payment.txHash}`
+          : data.payment.explorerBaseUrl,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Agent run failed.");
+    } finally {
+      setIsRunning(false);
+    }
   }
 
   return (
     <main className="p-8 space-y-6">
       <header className="space-y-2">
         <p className="text-sm uppercase tracking-wide text-gray-500">
-          Arc Testnet logistics MVP
+          Arc Testnet paid AI logistics demo
         </p>
-        <h1 className="text-3xl font-bold">Arc AI Logistics Demo</h1>
+        <h1 className="text-3xl font-bold">Dispatcher Agent Control Center</h1>
+        <p className="max-w-3xl text-gray-600">
+          Select one available truck and one shipment request. The GPS, Route,
+          Economics, and Risk agents run as a paid analysis bundle. The demo
+          charges {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet and
+          returns an on-chain proof.
+        </p>
       </header>
 
       <MapView />
 
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="border border-blue-500 p-4 rounded-xl space-y-2">
-          <h3 className="font-bold text-blue-600">Truck GPS Agent</h3>
-          <p className="text-sm text-gray-600">Current truck location</p>
-          <div className="text-sm space-y-1">
-            <p>{truckLocation.city}</p>
-            <p>
-              {formatCoordinate(truckLocation.lat)}, {formatCoordinate(truckLocation.lng)}
-            </p>
+      {error && (
+        <div className="border border-red-300 bg-red-50 p-4 rounded-xl text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="border p-4 rounded-xl space-y-3">
+          <h2 className="font-bold">Available Vehicles</h2>
+          <div className="space-y-3">
+            {demoData?.vehicles.map((vehicle) => (
+              <label
+                className="block border rounded-lg p-3 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50"
+                key={vehicle.id}
+              >
+                <input
+                  className="mr-2"
+                  type="radio"
+                  name="vehicle"
+                  value={vehicle.id}
+                  checked={selectedVehicleId === vehicle.id}
+                  onChange={() => setSelectedVehicleId(vehicle.id)}
+                />
+                <span className="font-semibold">{vehicle.label}</span>
+                <div className="mt-2 text-sm text-gray-600 space-y-1">
+                  <p>Driver: {vehicle.driver}</p>
+                  <p>Location: {formatLocation(vehicle.location)}</p>
+                  <p>Status: {vehicle.status}</p>
+                  <p>Preferred lane: {vehicle.preferredLane}</p>
+                </div>
+              </label>
+            ))}
           </div>
         </div>
 
-        <div className="border border-green-500 p-4 rounded-xl space-y-2">
-          <h3 className="font-bold text-green-600">Cargo Location Agent</h3>
-          <p className="text-sm text-gray-600">Cargo pickup location</p>
-          <div className="text-sm space-y-1">
-            <p>{cargoLocation.city}</p>
-            <p>
-              {formatCoordinate(cargoLocation.lat)}, {formatCoordinate(cargoLocation.lng)}
-            </p>
+        <div className="border p-4 rounded-xl space-y-3">
+          <h2 className="font-bold">Shipment Requests</h2>
+          <div className="space-y-3">
+            {demoData?.shipments.map((shipment) => (
+              <label
+                className="block border rounded-lg p-3 cursor-pointer has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
+                key={shipment.id}
+              >
+                <input
+                  className="mr-2"
+                  type="radio"
+                  name="shipment"
+                  value={shipment.id}
+                  checked={selectedShipmentId === shipment.id}
+                  onChange={() => setSelectedShipmentId(shipment.id)}
+                />
+                <span className="font-semibold">{shipment.reference}</span>
+                <div className="mt-2 text-sm text-gray-600 space-y-1">
+                  <p>
+                    Lane: {formatLocation(shipment.origin)} -> {formatLocation(shipment.destination)}
+                  </p>
+                  <p>Commodity: {shipment.commodity}</p>
+                  <p>Revenue: {shipment.revenue} {shipment.currency}</p>
+                  <p>Pickup: {shipment.pickupWindow}</p>
+                </div>
+              </label>
+            ))}
           </div>
-        </div>
-
-        <div className="border border-amber-500 p-4 rounded-xl space-y-2">
-          <h3 className="font-bold text-amber-600">Route Economics Agent</h3>
-          <p className="text-sm text-gray-600">Route economics</p>
-          {analysis ? (
-            <div className="text-sm space-y-1">
-              <p>Distance: {analysis.distance} km</p>
-              <p>ETA: {analysis.eta}</p>
-              <p>Profit: ${analysis.profit}</p>
-              <p>Source: {analysis.routeSource ?? "unknown"}</p>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">Loading analysis...</p>
-          )}
-        </div>
-
-        <div className="border border-purple-500 p-4 rounded-xl lg:col-span-2 space-y-2">
-          <h3 className="font-bold text-purple-600">AI Decision Agent</h3>
-          <p className="text-sm text-gray-600">AI recommendation</p>
-          {analysis ? (
-            <pre className="text-sm bg-gray-100 p-3 rounded overflow-auto whitespace-pre-wrap">
-              {formatAiAnalysis(analysis.ai)}
-            </pre>
-          ) : (
-            <p className="text-sm text-gray-500">Waiting for route economics...</p>
-          )}
-        </div>
-
-        <div className="border border-emerald-500 p-4 rounded-xl space-y-2">
-          <h3 className="font-bold text-emerald-600">Payment Agent</h3>
-          <p className="text-sm text-gray-600">Circle and Arc payment status</p>
-          {payment ? (
-            <div className="text-sm space-y-1 break-words">
-              <p>Success: {String(payment.success)}</p>
-              {payment.network && <p>Network: {payment.network}</p>}
-              {payment.chainId && <p>Chain ID: {payment.chainId}</p>}
-              {payment.status && <p>Status: {payment.status}</p>}
-              {payment.txHash && <p>Tx: {payment.txHash}</p>}
-              {payment.walletAddress && <p>Wallet: {payment.walletAddress}</p>}
-              {payment.explorer && (
-                <a
-                  className="text-emerald-700 underline"
-                  href={payment.explorer}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open Arc explorer
-                </a>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">Not reserved yet.</p>
-          )}
         </div>
       </section>
 
-      {analysis && (
-        <section className="border p-4 rounded-xl space-y-1">
-          <h2 className="font-bold">AI Analysis</h2>
+      <section className="border p-4 rounded-xl space-y-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="font-bold">Paid Agent Run</h2>
+            <p className="text-sm text-gray-600">
+              Fee: {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet.
+            </p>
+          </div>
+          <button
+            onClick={runAgents}
+            disabled={isRunning || !selectedVehicle || !selectedShipment}
+            className="bg-black text-white px-4 py-2 rounded disabled:cursor-not-allowed disabled:bg-gray-400"
+          >
+            {isRunning ? "Running agents..." : "Pay 0.005 USDC and run agents"}
+          </button>
+        </div>
 
-          <p>Distance: {analysis.distance} km</p>
-          <p>ETA: {analysis.eta}</p>
-          <p>Revenue: ${analysis.revenue}</p>
-          <p>Fuel: ${analysis.fuelCost}</p>
-          <p>Driver: ${analysis.driverCost}</p>
-          <p>Profit: ${analysis.profit}</p>
-          <p>
-            Decision:
-            <strong> {analysis.decision}</strong>
-          </p>
+        {selectedVehicle && selectedShipment && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="font-semibold">Selected truck</p>
+              <p>{selectedVehicle.label}</p>
+              <p>
+                {formatCoordinate(selectedVehicle.location.lat)}, {formatCoordinate(selectedVehicle.location.lng)}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="font-semibold">Selected shipment</p>
+              <p>{selectedShipment.reference}</p>
+              <p>
+                {formatLocation(selectedShipment.origin)} -> {formatLocation(selectedShipment.destination)}
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
 
-          <pre className="text-sm bg-gray-100 p-3 rounded overflow-auto whitespace-pre-wrap">
-            {formatAiAnalysis(analysis.ai)}
-          </pre>
+      {run && (
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {run.agents.map((agent) => (
+            <div className="border p-4 rounded-xl space-y-2" key={agent.name}>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-bold">{agent.name}</h3>
+                <span className="rounded bg-gray-100 px-2 py-1 text-xs uppercase">
+                  {agent.status}
+                </span>
+              </div>
+              <p className="text-sm text-gray-700">{agent.summary}</p>
+              <pre className="text-xs bg-gray-50 p-3 rounded whitespace-pre-wrap overflow-auto">
+                {formatDetails(agent.details)}
+              </pre>
+            </div>
+          ))}
         </section>
       )}
 
-      <button
-        onClick={reserve}
-        className="bg-black text-white px-4 py-2 rounded"
-      >
-        Reserve with USDC
-      </button>
+      {run && (
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="border p-4 rounded-xl space-y-2">
+            <h2 className="font-bold">Recommendation</h2>
+            <p className="text-2xl font-bold">{run.recommendation.decision}</p>
+            <p>Confidence: {run.recommendation.confidence}%</p>
+            <p>Source: {run.recommendation.source}</p>
+            <p className="text-sm text-gray-700">{run.recommendation.reason}</p>
+            <div className="text-sm text-gray-600">
+              <p>Distance: {run.economics.distanceKm} km</p>
+              <p>ETA: {run.economics.eta}</p>
+              <p>
+                Gross profit: {run.economics.grossProfit} {run.economics.currency}
+              </p>
+              <p>Risk: {run.risk.level} ({run.risk.score}/100)</p>
+            </div>
+          </div>
 
-      {payment && (
-        <div>
-          Success:{" "}
-          {payment.txHash ??
-            payment.status ??
-            payment.message ??
-            String(payment.success)}
-        </div>
+          <div className="border p-4 rounded-xl space-y-2 break-words">
+            <h2 className="font-bold">On-chain Proof</h2>
+            {payment && (
+              <div className="text-sm space-y-1">
+                <p>Network: {payment.network}</p>
+                <p>Fee: {payment.amount} {payment.currency}</p>
+                <p>Transaction ID: {payment.transactionId}</p>
+                <p>Status: {paymentStatus?.state ?? payment.state}</p>
+                <p>From: {payment.sourceWalletAddress}</p>
+                <p>To: {payment.destinationAddress}</p>
+                <p>Token: {payment.tokenAddress}</p>
+                {paymentStatus?.txHash && <p>Tx hash: {paymentStatus.txHash}</p>}
+                {(paymentStatus?.explorerUrl || payment.explorerBaseUrl) && (
+                  <a
+                    className="text-emerald-700 underline"
+                    href={paymentStatus?.explorerUrl ?? payment.explorerBaseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open Arc Testnet proof
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
       )}
     </main>
   );
