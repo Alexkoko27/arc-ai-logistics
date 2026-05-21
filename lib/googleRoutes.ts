@@ -48,6 +48,20 @@ function estimateFallbackEta(distanceKm: number) {
   return `${hours}h ${minutes}m`;
 }
 
+function fallbackRouteMetrics(
+  origin: RoutePoint,
+  destination: RoutePoint,
+  source: string,
+) {
+  const distanceKm = estimateFallbackDistanceKm(origin, destination);
+
+  return {
+    distanceKm,
+    eta: estimateFallbackEta(distanceKm),
+    source,
+  };
+}
+
 export async function getRouteMetrics(
   origin: RoutePoint = truckLocation,
   destination: RoutePoint = cargoLocation,
@@ -55,66 +69,76 @@ export async function getRouteMetrics(
   const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY;
 
   if (!apiKey) {
-    const distanceKm = estimateFallbackDistanceKm(origin, destination);
+    return fallbackRouteMetrics(origin, destination, "fallback-no-google-key");
+  }
+
+  try {
+    const response = await fetch(
+      "https://routes.googleapis.com/directions/v2:computeRoutes",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask":
+            "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline",
+        },
+        body: JSON.stringify({
+          origin: {
+            location: {
+              latLng: {
+                latitude: origin.lat,
+                longitude: origin.lng,
+              },
+            },
+          },
+          destination: {
+            location: {
+              latLng: {
+                latitude: destination.lat,
+                longitude: destination.lng,
+              },
+            },
+          },
+          travelMode: "DRIVE",
+          routingPreference: "TRAFFIC_AWARE",
+          computeAlternativeRoutes: false,
+          languageCode: "en-US",
+          units: "METRIC",
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      return fallbackRouteMetrics(
+        origin,
+        destination,
+        `fallback-google-routes-${response.status}`,
+      );
+    }
+
+    const data = await response.json();
+    const route = data.routes?.[0];
+
+    if (!route) {
+      return fallbackRouteMetrics(
+        origin,
+        destination,
+        "fallback-google-routes-empty",
+      );
+    }
 
     return {
-      distanceKm,
-      eta: estimateFallbackEta(distanceKm),
-      source: "fallback",
+      distanceKm: Number((route.distanceMeters / 1000).toFixed(1)),
+      eta: formatDuration(route.duration),
+      encodedPolyline: route.polyline?.encodedPolyline,
+      source: "google-routes",
     };
+  } catch {
+    return fallbackRouteMetrics(
+      origin,
+      destination,
+      "fallback-google-routes-error",
+    );
   }
-
-  const response = await fetch(
-    "https://routes.googleapis.com/directions/v2:computeRoutes",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask":
-          "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline",
-      },
-      body: JSON.stringify({
-        origin: {
-          location: {
-            latLng: {
-              latitude: origin.lat,
-              longitude: origin.lng,
-            },
-          },
-        },
-        destination: {
-          location: {
-            latLng: {
-              latitude: destination.lat,
-              longitude: destination.lng,
-            },
-          },
-        },
-        travelMode: "DRIVE",
-        routingPreference: "TRAFFIC_AWARE",
-        computeAlternativeRoutes: false,
-        languageCode: "en-US",
-        units: "METRIC",
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Google Routes failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const route = data.routes?.[0];
-
-  if (!route) {
-    throw new Error("Google Routes returned no route");
-  }
-
-  return {
-    distanceKm: Number((route.distanceMeters / 1000).toFixed(1)),
-    eta: formatDuration(route.duration),
-    encodedPolyline: route.polyline?.encodedPolyline,
-    source: "google-routes",
-  };
 }
