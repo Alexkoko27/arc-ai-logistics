@@ -76,7 +76,6 @@ type AgentRun = {
 };
 
 type DemoDataResponse = {
-  vehicles: Vehicle[];
   shipments: Shipment[];
   agentFee: {
     amount: string;
@@ -118,10 +117,6 @@ type PaymentStatusResponse = {
   message?: string;
 };
 
-function formatCoordinate(value: number) {
-  return value.toFixed(4);
-}
-
 function formatLocation(location: Coordinates) {
   return `${location.city}, ${location.country}`;
 }
@@ -138,7 +133,6 @@ function formatDetails(details: AgentResult["details"]) {
 
 export default function Home() {
   const [demoData, setDemoData] = useState<DemoDataResponse | null>(null);
-  const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [selectedShipmentId, setSelectedShipmentId] = useState("");
   const [run, setRun] = useState<AgentRun | null>(null);
   const [payment, setPayment] = useState<PaymentResponse | null>(null);
@@ -153,18 +147,10 @@ export default function Home() {
       .then((r) => r.json())
       .then((data: DemoDataResponse) => {
         setDemoData(data);
-        setSelectedVehicleId(data.vehicles[0]?.id ?? "");
         setSelectedShipmentId(data.shipments[0]?.id ?? "");
       })
       .catch(() => setError("Unable to load dispatcher demo data."));
   }, []);
-
-  const selectedVehicle = useMemo(
-    () =>
-      demoData?.vehicles.find((vehicle) => vehicle.id === selectedVehicleId) ??
-      null,
-    [demoData, selectedVehicleId],
-  );
 
   const selectedShipment = useMemo(
     () =>
@@ -173,6 +159,13 @@ export default function Home() {
       ) ?? null,
     [demoData, selectedShipmentId],
   );
+
+  useEffect(() => {
+    setRun(null);
+    setPayment(null);
+    setPaymentStatus(null);
+    setError(null);
+  }, [selectedShipmentId]);
 
   useEffect(() => {
     if (!payment?.transactionId || paymentStatus?.terminal) return;
@@ -190,7 +183,7 @@ export default function Home() {
   }, [payment?.transactionId, paymentStatus?.terminal]);
 
   async function runAgents() {
-    if (!selectedVehicleId || !selectedShipmentId) return;
+    if (!selectedShipmentId) return;
 
     setIsRunning(true);
     setError(null);
@@ -205,7 +198,6 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          vehicleId: selectedVehicleId,
           shipmentId: selectedShipmentId,
         }),
       });
@@ -241,14 +233,10 @@ export default function Home() {
         </p>
         <h1 className="text-3xl font-bold">Dispatcher Agent Control Center</h1>
         <p className="max-w-3xl text-gray-600">
-          Select one available truck and one shipment request. The GPS, Route,
-          Economics, and Risk agents run as a paid analysis bundle. The demo
-          charges {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet and
-          returns an on-chain proof.
+          Select one shipment request. The Fleet GPS, Route, Economics, and Risk
+          agents run as a paid analysis bundle. The demo charges {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet and returns an on-chain proof.
         </p>
       </header>
-
-      <MapView />
 
       {error && (
         <div className="border border-red-300 bg-red-50 p-4 rounded-xl text-sm text-red-700">
@@ -257,34 +245,6 @@ export default function Home() {
       )}
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="border p-4 rounded-xl space-y-3">
-          <h2 className="font-bold">Available Vehicles</h2>
-          <div className="space-y-3">
-            {demoData?.vehicles.map((vehicle) => (
-              <label
-                className="block border rounded-lg p-3 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50"
-                key={vehicle.id}
-              >
-                <input
-                  className="mr-2"
-                  type="radio"
-                  name="vehicle"
-                  value={vehicle.id}
-                  checked={selectedVehicleId === vehicle.id}
-                  onChange={() => setSelectedVehicleId(vehicle.id)}
-                />
-                <span className="font-semibold">{vehicle.label}</span>
-                <div className="mt-2 text-sm text-gray-600 space-y-1">
-                  <p>Driver: {vehicle.driver}</p>
-                  <p>Location: {formatLocation(vehicle.location)}</p>
-                  <p>Status: {vehicle.status}</p>
-                  <p>Preferred lane: {vehicle.preferredLane}</p>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-
         <div className="border p-4 rounded-xl space-y-3">
           <h2 className="font-bold">Shipment Requests</h2>
           <div className="space-y-3">
@@ -312,6 +272,31 @@ export default function Home() {
             ))}
           </div>
         </div>
+
+        <div className="border p-4 rounded-xl space-y-3">
+          <h2 className="font-bold">Selected Shipment Map</h2>
+          {selectedShipment ? (
+            <>
+              <MapView
+                origin={selectedShipment.origin}
+                destination={selectedShipment.destination}
+                height={360}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="font-semibold">Origin</p>
+                  <p>{formatLocation(selectedShipment.origin)}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="font-semibold">Destination</p>
+                  <p>{formatLocation(selectedShipment.destination)}</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">Loading map...</p>
+          )}
+        </div>
       </section>
 
       <section className="border p-4 rounded-xl space-y-4">
@@ -324,27 +309,22 @@ export default function Home() {
           </div>
           <button
             onClick={runAgents}
-            disabled={isRunning || !selectedVehicle || !selectedShipment}
+            disabled={isRunning || !selectedShipment}
             className="bg-black text-white px-4 py-2 rounded disabled:cursor-not-allowed disabled:bg-gray-400"
           >
-            {isRunning ? "Running agents..." : "Pay 0.005 USDC and run agents"}
+            {isRunning
+              ? "Running agents..."
+              : "Pay 0.005 USDC and analyze shipment"}
           </button>
         </div>
 
-        {selectedVehicle && selectedShipment && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="font-semibold">Selected truck</p>
-              <p>{selectedVehicle.label}</p>
-              <p>
-                {formatCoordinate(selectedVehicle.location.lat)}, {formatCoordinate(selectedVehicle.location.lng)}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="font-semibold">Selected shipment</p>
-              <p>{selectedShipment.reference}</p>
-              <p>{formatLane(selectedShipment.origin, selectedShipment.destination)}</p>
-            </div>
+        {selectedShipment && (
+          <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+            <p className="font-semibold">Selected shipment</p>
+            <p>{selectedShipment.reference}</p>
+            <p>{formatLane(selectedShipment.origin, selectedShipment.destination)}</p>
+            <p>Revenue: {selectedShipment.revenue} {selectedShipment.currency}</p>
+            <p>Pickup: {selectedShipment.pickupWindow}</p>
           </div>
         )}
       </section>
@@ -379,6 +359,7 @@ export default function Home() {
             <div className="text-sm text-gray-600">
               <p>Distance: {run.economics.distanceKm} km</p>
               <p>ETA: {run.economics.eta}</p>
+              <p>Route source: {run.economics.routeSource}</p>
               <p>
                 Gross profit: {run.economics.grossProfit} {run.economics.currency}
               </p>
