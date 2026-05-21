@@ -1,5 +1,10 @@
 import { cargoLocation, truckLocation } from "@/lib/routeData";
 
+type RoutePoint = {
+  lat: number;
+  lng: number;
+};
+
 function formatDuration(duration: string) {
   const seconds = Number(duration.replace("s", ""));
   const hours = Math.floor(seconds / 3600);
@@ -9,13 +14,52 @@ function formatDuration(duration: string) {
   return `${hours}h ${minutes}m`;
 }
 
-export async function getRouteMetrics() {
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function estimateFallbackDistanceKm(origin: RoutePoint, destination: RoutePoint) {
+  const earthRadiusKm = 6371;
+  const deltaLat = toRadians(destination.lat - origin.lat);
+  const deltaLng = toRadians(destination.lng - origin.lng);
+  const lat1 = toRadians(origin.lat);
+  const lat2 = toRadians(destination.lat);
+
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(deltaLng / 2) *
+      Math.sin(deltaLng / 2);
+
+  const directDistanceKm =
+    earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return Number((directDistanceKm * 1.22).toFixed(1));
+}
+
+function estimateFallbackEta(distanceKm: number) {
+  const averageSpeedKmH = 72;
+  const totalMinutes = Math.round((distanceKm / averageSpeedKmH) * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours <= 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+}
+
+export async function getRouteMetrics(
+  origin: RoutePoint = truckLocation,
+  destination: RoutePoint = cargoLocation,
+) {
   const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY;
 
   if (!apiKey) {
+    const distanceKm = estimateFallbackDistanceKm(origin, destination);
+
     return {
-      distanceKm: 289,
-      eta: "3h 45m",
+      distanceKm,
+      eta: estimateFallbackEta(distanceKm),
       source: "fallback",
     };
   }
@@ -34,16 +78,16 @@ export async function getRouteMetrics() {
         origin: {
           location: {
             latLng: {
-              latitude: truckLocation.lat,
-              longitude: truckLocation.lng,
+              latitude: origin.lat,
+              longitude: origin.lng,
             },
           },
         },
         destination: {
           location: {
             latLng: {
-              latitude: cargoLocation.lat,
-              longitude: cargoLocation.lng,
+              latitude: destination.lat,
+              longitude: destination.lng,
             },
           },
         },
