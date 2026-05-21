@@ -1,6 +1,13 @@
 import { analyzeRouteWithGemini } from "@/lib/gemini";
 import { getRouteMetrics } from "@/lib/googleRoutes";
-import { findShipment, findVehicle, Shipment, Vehicle } from "@/lib/demoData";
+import {
+  findShipment,
+  findVehicle,
+  shipments,
+  Shipment,
+  Vehicle,
+  vehicles,
+} from "@/lib/demoData";
 
 type AgentStatus = "complete" | "warning";
 
@@ -49,13 +56,21 @@ function createRunId(vehicleId: string, shipmentId: string) {
   return `run-${vehicleId}-${shipmentId}-${suffix}`;
 }
 
+function getDemoVehicle(vehicleId?: string) {
+  if (vehicleId) return findVehicle(vehicleId);
+
+  return (
+    vehicles.find((vehicle) => vehicle.status === "available") ?? vehicles[0]
+  );
+}
+
 function calculateRisk(vehicle: Vehicle, shipment: Shipment, distanceKm: number) {
   const factors: string[] = [];
   let score = 18;
 
   if (vehicle.status !== "available") {
     score += 30;
-    factors.push(`Vehicle status is ${vehicle.status}.`);
+    factors.push(`Fleet demo vehicle status is ${vehicle.status}.`);
   }
 
   if (vehicle.hoursUntilAvailable > 0) {
@@ -147,12 +162,19 @@ function parseAiDecision(
   };
 }
 
-export async function runPaidAgentAnalysis(vehicleId: string, shipmentId: string) {
-  const vehicle = findVehicle(vehicleId);
+export async function runPaidAgentAnalysis(
+  shipmentId: string,
+  vehicleId?: string,
+) {
+  const vehicle = getDemoVehicle(vehicleId);
   const shipment = findShipment(shipmentId);
 
-  if (!vehicle || !shipment) {
-    throw new Error("Selected vehicle or shipment was not found.");
+  if (!shipment) {
+    throw new Error("Selected shipment was not found.");
+  }
+
+  if (!vehicle) {
+    throw new Error("No demo fleet vehicle is available for analysis.");
   }
 
   const pickupRoute = await getRouteMetrics(vehicle.location, shipment.origin);
@@ -180,9 +202,9 @@ export async function runPaidAgentAnalysis(vehicleId: string, shipmentId: string
 
   const agents: AgentResult[] = [
     {
-      name: "GPS Agent",
+      name: "Fleet GPS Agent",
       status: "complete",
-      summary: `Truck located near ${vehicle.location.city}, ${vehicle.location.country}.`,
+      summary: `Demo fleet source selected ${vehicle.label} near ${vehicle.location.city}, ${vehicle.location.country}.`,
       details: {
         vehicleId: vehicle.id,
         lat: vehicle.location.lat,
@@ -246,4 +268,8 @@ export async function runPaidAgentAnalysis(vehicleId: string, shipmentId: string
       status: "pending",
     },
   } satisfies AgentRunResult;
+}
+
+export function getDefaultShipmentId() {
+  return shipments[0]?.id ?? "";
 }
