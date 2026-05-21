@@ -126,6 +126,10 @@ function formatLocation(location: Coordinates) {
   return `${location.city}, ${location.country}`;
 }
 
+function formatLane(origin: Coordinates, destination: Coordinates) {
+  return `${formatLocation(origin)} -> ${formatLocation(destination)}`;
+}
+
 function formatDetails(details: AgentResult["details"]) {
   return Object.entries(details)
     .map(([key, value]) => `${key}: ${String(value)}`)
@@ -299,9 +303,7 @@ export default function Home() {
                 />
                 <span className="font-semibold">{shipment.reference}</span>
                 <div className="mt-2 text-sm text-gray-600 space-y-1">
-                  <p>
-                    Lane: {formatLocation(shipment.origin)} -> {formatLocation(shipment.destination)}
-                  </p>
+                  <p>Lane: {formatLane(shipment.origin, shipment.destination)}</p>
                   <p>Commodity: {shipment.commodity}</p>
                   <p>Revenue: {shipment.revenue} {shipment.currency}</p>
                   <p>Pickup: {shipment.pickupWindow}</p>
@@ -341,9 +343,7 @@ export default function Home() {
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="font-semibold">Selected shipment</p>
               <p>{selectedShipment.reference}</p>
-              <p>
-                {formatLocation(selectedShipment.origin)} -> {formatLocation(selectedShipment.destination)}
-              </p>
+              <p>{formatLane(selectedShipment.origin, selectedShipment.destination)}</p>
             </div>
           </div>
         )}
