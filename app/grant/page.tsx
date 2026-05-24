@@ -158,7 +158,14 @@ export default function GrantPage() {
 
       <section className="space-y-3 border border-gray-200 p-5">
         <h2 className="text-2xl font-bold">Demo Video</h2>
-        <p className="font-semibold">Demo video coming soon.</p>
+        <p className="text-gray-700">
+          Short walkthrough of the Arc AI Logistics multi-agent dispatch demo.
+        </p>
+        <video
+          className="w-full rounded-lg border border-gray-200"
+          src="/demo/arc-ai-logistics-demo.mp4"
+          controls
+        />
         <ul className="list-disc space-y-2 pl-5 text-gray-700">
           {videoPlan.map((item) => (
             <li key={item}>{item}</li>
