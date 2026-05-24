@@ -1,128 +1,108 @@
 # Arc AI Logistics
 
-A Next.js demo dApp for AI-assisted logistics on Arc Testnet. The app demonstrates a dispatcher workflow where a user selects a vehicle and shipment, pays a tiny USDC fee on Arc Testnet, and receives an AI-assisted recommendation plus on-chain proof.
+AI agents for logistics dispatch, paid with USDC on Arc.
 
-## Demo Scenario
+## Live Demo
 
-```text
-Dispatcher selects truck + shipment
--> GPS Agent validates truck position
--> Route Agent estimates pickup and delivery distance / ETA
--> Economics Agent estimates costs, revenue, and profit
--> Risk Agent checks timing, vehicle status, cross-border, and load factors
--> Circle Developer-Controlled Wallet pays 0.005 USDC on Arc Testnet
--> UI shows recommendation and on-chain transaction proof
-```
+https://arc-ai-logistics.vercel.app/
 
-This milestone focuses on Arc/Circle testnet demonstration value: cheap stablecoin-native paid AI agent actions with a visible transaction trail.
+## Summary
 
-## Requirements
+Arc AI Logistics is an agentic logistics coordination system where specialized AI agents evaluate freight opportunities and settle work using USDC on Arc. The agents combine GPS/fleet location, shipment data, routing, economics, and risk signals to produce a clear dispatch recommendation. The demo shows how logistics workflows can move toward programmable agent economics with payment proof on stablecoin-native infrastructure.
 
-- Node.js 20+
-- npm
-- Google Maps JavaScript API key
-- Google Routes API server key
-- Gemini API key
-- Circle developer-controlled wallets API key and entity secret
-- Funded Arc Testnet Circle wallet
+## Architecture
 
-## Setup
+![AI Agent System Architecture](public/images/Arc_GPS_plan.png)
 
-Install dependencies:
+AI Agent System: GPS, shipment, route, economics, risk and payment agents coordinate logistics decisions and settle paid agent runs through Circle + Arc.
+
+## How Arc + Circle Are Used
+
+Arc provides a stablecoin-native blockchain environment for agent payments and settlement. USDC is the payment unit for paid agent runs, making the demo a practical model for machine-to-machine agent payments.
+
+Circle Developer Controlled Wallets are used/planned as the wallet and payment layer for programmatic payments. Nanopayments and micropayments are the target model for paying individual AI-agent work units such as route checks, economics calculations, and risk scoring.
+
+The current demo is testnet-focused and shows a paid agent run with transaction proof. The next milestones move toward fully live Circle/Arc settlement, persistent payment records, and production-grade transaction state handling.
+
+## Current Demo Status
+
+The current demo includes:
+
+- Shipment request selection
+- Map view with origin/destination
+- Agent run flow
+- GPS Agent
+- Route Agent
+- Economics Agent
+- Risk Agent
+- Recommendation: BOOK / SKIP
+- Paid Agent Run panel
+- Agent Payment Ledger
+- On-chain proof / tx hash display
+
+## Grant Milestones
+
+1. Real Arc Testnet settlement for paid agent runs
+   - Replace simulated tx proof with real Arc testnet transaction flow.
+   - Store tx hash and explorer link per agent run.
+
+2. Circle Developer Controlled Wallet integration
+   - Programmatic wallet creation/management.
+   - USDC payments for agent execution.
+
+3. Agent Payment Ledger
+   - Track per-agent micro-payments.
+   - Show total paid per run.
+   - Prepare for nanopayment-style settlement.
+
+4. Multi-shipment autonomous optimization
+   - Let agents compare several shipment requests.
+   - Select the best one based on ETA, profit, risk and location.
+
+5. Public demo and grant-ready documentation
+   - Improve /grant page.
+   - Add short demo video.
+   - Prepare the project for Circle/Arc ecosystem review.
+
+## Tech Stack
+
+- Next.js
+- TypeScript
+- Tailwind CSS
+- Google Maps
+- Gemini / AI agent logic
+- Circle Developer Platform
+- Arc Testnet
+- Vercel
+
+## Local Development
 
 ```bash
 npm install
-```
-
-Create local environment variables:
-
-```bash
-cp .env.example .env.local
-```
-
-Fill `.env.local`. Do not commit `.env.local`; it is protected by `.gitignore`.
-
-Required payment variables for the paid agent demo:
-
-```env
-CIRCLE_API_KEY=
-CIRCLE_ENTITY_SECRET=
-CIRCLE_WALLET_ID=
-CIRCLE_WALLET_ADDRESS=
-CIRCLE_FEE_RECEIVER_ADDRESS=
-AGENT_ANALYSIS_FEE_USDC=0.005
-ARC_USDC_TOKEN_ADDRESS=0x3600000000000000000000000000000000000000
-```
-
-Arc Testnet defaults are documented in `.env.example`:
-
-```env
-ARC_RPC_URL=https://rpc.testnet.arc.network
-ARC_CHAIN_ID=5042002
-ARC_EXPLORER_URL=https://testnet.arcscan.app
-```
-
-## Development
-
-Run the app locally:
-
-```bash
 npm run dev
 ```
 
-Open:
-
-```text
-http://localhost:3000
-```
-
-Run checks:
-
-```bash
-npm run lint
-npm run build
-```
-
-## Circle Wallet Setup
-
-After adding `CIRCLE_API_KEY` and `CIRCLE_ENTITY_SECRET` to `.env.local`, create an Arc Testnet wallet:
-
-```bash
-npm run create:circle-wallet
-```
-
-Copy the returned wallet set id, wallet id, and wallet address into `.env.local`:
+Required environment variables, without values:
 
 ```env
-CIRCLE_WALLET_SET_ID=
-CIRCLE_WALLET_ID=
-CIRCLE_WALLET_ADDRESS=
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
+GOOGLE_MAPS_API_KEY=
+GEMINI_API_KEY=
+CIRCLE_API_KEY=
+CIRCLE_ENTITY_SECRET=
 ```
 
-Then fund the wallet with Arc Testnet USDC using the Circle faucet. For the demo fee recipient, set `CIRCLE_FEE_RECEIVER_ADDRESS` to another Arc Testnet address you control.
+Never commit `.env.local` or API keys.
 
-## Project Structure
+## Demo Video
 
-```text
-app/page.tsx                    Dispatcher demo UI and paid agent run flow
-app/api/demo-data/route.ts      Demo vehicles, shipments, and fee config
-app/api/agent-runs/route.ts     Runs GPS, Route, Economics, Risk agents and creates fee transfer
-app/api/pay/status/route.ts     Polls Circle transaction status
-app/api/analyze/route.ts        Legacy route analysis endpoint
-app/api/pay/route.ts            Legacy reservation preparation endpoint
-components/MapView.tsx          Google Maps display
-lib/agentRun.ts                 Demo agent orchestration and recommendation logic
-lib/circle.ts                   Circle Arc Testnet transfer helpers
-lib/demoData.ts                 Demo vehicles and shipment requests
-lib/googleRoutes.ts             Google Routes API integration with fallback
-lib/gemini.ts                   Gemini analysis with fallback
-scripts/create-circle-wallet.ts Circle wallet creation helper
-```
+Demo video coming soon.
 
-## Notes
+Recommended 60-90 second structure:
 
-- `.env.example` is safe to commit.
-- `.env.local` must stay private.
-- If Google Routes is not configured, route calculations use a local distance fallback.
-- If Gemini is not configured or fails, the recommendation falls back to local dispatch rules.
-- The first paid testnet action is an agent-analysis fee transfer, not a freight escrow contract yet.
+- 0-10s: Problem - logistics dispatch is still manual and fragmented.
+- 10-25s: Select a shipment request.
+- 25-40s: Agents fetch GPS, route, economics and risk data.
+- 40-55s: App recommends BOOK / SKIP.
+- 55-70s: Paid Agent Run shows USDC cost, tx hash and Arc proof.
+- 70-90s: Explain why Arc + Circle enable machine-to-machine agent payments.
