@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 const milestones = [
   {
@@ -36,9 +37,9 @@ export default function GrantPage() {
   return (
     <main className="mx-auto max-w-6xl space-y-10 px-6 py-10">
       <section className="space-y-4 border-b border-gray-200 pb-8">
-        <a className="text-sm text-gray-600 underline" href="/">
+        <Link className="text-sm text-gray-600 underline" href="/">
           Open Live Demo
-        </a>
+        </Link>
         <div className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             Circle Grant Pitch
@@ -132,12 +133,12 @@ export default function GrantPage() {
             </div>
           ))}
         </div>
-        <a
+        <Link
           className="inline-block border border-black px-4 py-2 text-sm font-semibold hover:bg-black hover:text-white"
           href="/"
         >
           Open Live Demo
-        </a>
+        </Link>
       </section>
 
       <section className="space-y-4">
