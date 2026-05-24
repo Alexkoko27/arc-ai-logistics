@@ -117,6 +117,15 @@ type PaymentStatusResponse = {
   message?: string;
 };
 
+const agentPaymentLedger = [
+  { agent: "GPS Agent", amount: "0.001 USDC" },
+  { agent: "Route Agent", amount: "0.0015 USDC" },
+  { agent: "Economics Agent", amount: "0.0015 USDC" },
+  { agent: "Risk Agent", amount: "0.001 USDC" },
+];
+
+const totalAgentPayment = "0.005 USDC";
+
 function formatLocation(location: Coordinates) {
   return `${location.city}, ${location.country}`;
 }
@@ -159,6 +168,14 @@ export default function Home() {
       ) ?? null,
     [demoData, selectedShipmentId],
   );
+
+  const proofHash = paymentStatus?.txHash ?? payment?.txHash ?? null;
+  const proofLink = paymentStatus?.explorerUrl ?? payment?.explorerBaseUrl ?? null;
+  const ledgerStatus = proofHash
+    ? "Confirmed / Testnet proof"
+    : payment
+      ? "Paid / Testnet proof pending"
+      : "Demo tx proof pending";
 
   useEffect(() => {
     if (!payment?.transactionId || paymentStatus?.terminal) return;
@@ -229,10 +246,20 @@ export default function Home() {
   return (
     <main className="p-8 space-y-6">
       <header className="space-y-2">
-        <p className="text-sm uppercase tracking-wide text-gray-500">
-          Arc Testnet paid AI logistics demo
-        </p>
-        <h1 className="text-3xl font-bold">Dispatcher Agent Control Center</h1>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-2">
+            <p className="text-sm uppercase tracking-wide text-gray-500">
+              Arc Testnet paid AI logistics demo
+            </p>
+            <h1 className="text-3xl font-bold">Dispatcher Agent Control Center</h1>
+          </div>
+          <a
+            className="text-sm font-semibold underline underline-offset-4"
+            href="/grant"
+          >
+            Circle grant pitch
+          </a>
+        </div>
         <p className="max-w-3xl text-gray-600">
           Select one shipment request. The Fleet GPS, Route, Economics, and Risk
           agents run as a paid analysis bundle. The demo charges {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet and returns an on-chain proof.
@@ -319,15 +346,55 @@ export default function Home() {
           </button>
         </div>
 
-        {selectedShipment && (
-          <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-            <p className="font-semibold">Selected shipment</p>
-            <p>{selectedShipment.reference}</p>
-            <p>{formatLane(selectedShipment.origin, selectedShipment.destination)}</p>
-            <p>Revenue: {selectedShipment.revenue} {selectedShipment.currency}</p>
-            <p>Pickup: {selectedShipment.pickupWindow}</p>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {selectedShipment && (
+            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+              <p className="font-semibold">Selected shipment</p>
+              <p>{selectedShipment.reference}</p>
+              <p>{formatLane(selectedShipment.origin, selectedShipment.destination)}</p>
+              <p>Revenue: {selectedShipment.revenue} {selectedShipment.currency}</p>
+              <p>Pickup: {selectedShipment.pickupWindow}</p>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-gray-200 p-3 text-sm">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-200 pb-2">
+              <div>
+                <h3 className="font-bold">Agent Payment Ledger</h3>
+                <p className="text-gray-600">Per-agent USDC work units</p>
+              </div>
+              <span className="text-xs font-semibold uppercase text-gray-500">
+                {ledgerStatus}
+              </span>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {agentPaymentLedger.map((row) => (
+                <div className="flex justify-between py-2" key={row.agent}>
+                  <span>{row.agent}</span>
+                  <span className="font-mono">{row.amount}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between border-t border-gray-200 pt-2 font-bold">
+              <span>Total</span>
+              <span className="font-mono">{totalAgentPayment}</span>
+            </div>
+            <div className="mt-3 space-y-1 break-words text-xs text-gray-600">
+              <p>Tx hash: {proofHash ?? "Demo tx proof pending"}</p>
+              {payment?.transactionId && <p>Transaction ID: {payment.transactionId}</p>}
+              {proofLink && (
+                <a
+                  className="font-semibold text-gray-800 underline underline-offset-4"
+                  href={proofLink}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open Arc Testnet explorer proof
+                </a>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </section>
 
       {run && (
@@ -379,11 +446,11 @@ export default function Home() {
                 <p>From: {payment.sourceWalletAddress}</p>
                 <p>To: {payment.destinationAddress}</p>
                 <p>Token: {payment.tokenAddress}</p>
-                {paymentStatus?.txHash && <p>Tx hash: {paymentStatus.txHash}</p>}
-                {(paymentStatus?.explorerUrl || payment.explorerBaseUrl) && (
+                {proofHash && <p>Tx hash: {proofHash}</p>}
+                {proofLink && (
                   <a
                     className="text-emerald-700 underline"
-                    href={paymentStatus?.explorerUrl ?? payment.explorerBaseUrl}
+                    href={proofLink}
                     target="_blank"
                     rel="noreferrer"
                   >
