@@ -1,44 +1,77 @@
 # Arc AI Logistics
 
-AI agents for logistics dispatch, paid with USDC on Arc.
+AI agents for freight coordination, paid with USDC on Arc.
 
-## Live Demo
+## Links
 
-https://arc-ai-logistics.vercel.app/
+- Live Demo: https://arc-ai-logistics.vercel.app/
+- Grant Pitch Page: https://arc-ai-logistics.vercel.app/grant
+- Demo Video: https://arc-ai-logistics.vercel.app/demo/arc-ai-logistics-demo.mp4
 
-## Summary
+## Short Pitch
 
-Arc AI Logistics is an agentic logistics coordination system where specialized AI agents evaluate freight opportunities and settle work using USDC on Arc. The agents combine GPS/fleet location, shipment data, routing, economics, and risk signals to produce a clear dispatch recommendation. The demo shows how logistics workflows can move toward programmable agent economics with payment proof on stablecoin-native infrastructure.
+Logistics dispatch is fragmented across GPS/fleet systems, routing tools, pricing inputs, risk checks, and payment workflows. Dispatchers often evaluate shipment opportunities manually, even when the decision depends on real-time location, route conditions, economics, and operational constraints.
+
+Arc AI Logistics is an agentic logistics coordination system where specialized AI agents evaluate freight opportunities and coordinate USDC-denominated paid agent runs using Arc + Circle infrastructure. The demo shows how GPS/Fleet, Route, Economics, and Risk agents can work together to produce a clear BOOK / SKIP recommendation for a shipment request.
+
+The current demo is testnet-oriented and demonstrates how agent execution can be priced in USDC and prepared for settlement on Arc using Circle infrastructure. It is designed as a grant-ready prototype for machine-to-machine payment flows in logistics, with the next milestone focused on real Arc testnet settlement and Circle Developer Controlled Wallet integration.
+
+## What The Demo Shows
+
+- Shipment request selection
+- Map view with origin/destination
+- GPS/Fleet Agent
+- Route Agent
+- Economics Agent
+- Risk Agent
+- BOOK / SKIP recommendation
+- Agent Payment Ledger
+- USDC-denominated paid agent run
+- On-chain proof / testnet proof simulation
+- Embedded demo video on /grant
 
 ## Architecture
 
 ![AI Agent System Architecture](public/images/Arc_GPS_plan.png)
 
-AI Agent System: GPS, shipment, route, economics, risk and payment agents coordinate logistics decisions and settle paid agent runs through Circle + Arc.
+AI Agent System: GPS, shipment, route, economics, risk, and payment agents coordinate freight decisions and prepare paid agent runs through Circle + Arc infrastructure.
 
-## How Arc + Circle Are Used
+## Why Arc + Circle
 
-Arc provides a stablecoin-native blockchain environment for agent payments and settlement. USDC is the payment unit for paid agent runs, making the demo a practical model for machine-to-machine agent payments.
+Arc is a stablecoin-native blockchain environment suited for programmable settlement. For this project, Arc is the target infrastructure for agent payment proof, testnet settlement, and future machine-to-machine commerce between logistics services.
 
-Circle Developer Controlled Wallets are used/planned as the wallet and payment layer for programmatic payments. Nanopayments and micropayments are the target model for paying individual AI-agent work units such as route checks, economics calculations, and risk scoring.
+USDC is used as the unit of account for agent execution. In the current demo, a paid agent run is priced at 0.005 USDC, making the cost of each AI-agent work unit visible inside the product.
 
-The current demo is testnet-focused and shows a paid agent run with transaction proof. The next milestones move toward fully live Circle/Arc settlement, persistent payment records, and production-grade transaction state handling.
+Circle Developer Controlled Wallets are the planned wallet layer for programmatic USDC payments. The goal is for a Payment Agent to initiate, track, and reconcile agent execution payments without exposing private keys to users or application code.
 
-## Current Demo Status
+Nanopayment-style flows are the target model for paying individual agent work units such as GPS checks, route analysis, economics calculations, and risk scoring. The current demo shows the workflow and testnet proof concept; the next milestone is real Arc testnet settlement.
 
-The current demo includes:
+## Agent Payment Ledger
 
-- Shipment request selection
-- Map view with origin/destination
-- Agent run flow
-- GPS Agent
-- Route Agent
-- Economics Agent
-- Risk Agent
-- Recommendation: BOOK / SKIP
-- Paid Agent Run panel
-- Agent Payment Ledger
-- On-chain proof / tx hash display
+The demo includes a USDC-denominated ledger for agent execution:
+
+| Agent | Cost |
+| --- | ---: |
+| GPS Agent | 0.001 USDC |
+| Route Agent | 0.0015 USDC |
+| Economics Agent | 0.0015 USDC |
+| Risk Agent | 0.001 USDC |
+| Total | 0.005 USDC |
+
+This matters because it makes AI-agent execution economically visible and prepares the system for machine-to-machine payment flows. Instead of treating AI analysis as a hidden backend cost, the demo shows how each agent task can become a priced, auditable work unit.
+
+## Current Status
+
+Current status:
+
+- Live public demo: COMPLETE
+- Agent cards and recommendation flow: COMPLETE
+- Agent Payment Ledger: COMPLETE
+- Grant pitch page: COMPLETE
+- Embedded demo video: COMPLETE
+- Real Arc testnet settlement: NEXT
+- Circle Developer Controlled Wallet integration: NEXT
+- Autonomous multi-shipment optimization: NEXT
 
 ## Roadmap / Grant Milestones
 
@@ -57,7 +90,7 @@ The UI now shows per-agent execution costs for GPS, Route, Economics, and Risk a
 ### Milestone 3 — Grant-Ready Public Pitch
 Status: COMPLETE
 
-Added project positioning, architecture diagram, /grant page, Circle/Arc framing, and demo video outline.
+Added project positioning, architecture diagram, /grant page, Circle/Arc framing, and demo video.
 The project now has a clearer public explanation for ecosystem reviewers and grant submission.
 
 ### Milestone 4 — Real Arc Testnet Settlement
@@ -80,11 +113,11 @@ Agents should rank opportunities by distance, ETA, profit, risk, and truck avail
 
 ## Tech Stack
 
-- Next.js
+- Next.js App Router
 - TypeScript
 - Tailwind CSS
 - Google Maps
-- Gemini / AI agent logic
+- AI agent orchestration / Gemini
 - Circle Developer Platform
 - Arc Testnet
 - Vercel
@@ -101,23 +134,13 @@ Required environment variables, without values:
 ```env
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 GOOGLE_MAPS_API_KEY=
-GOOGLE_MAPS_SERVER_API_KEY=
 GEMINI_API_KEY=
 CIRCLE_API_KEY=
 CIRCLE_ENTITY_SECRET=
 ```
 
-Never commit `.env.local` or API keys.
+Never commit `.env.local`, API keys, entity secrets, or private keys.
 
-## Demo Video
+## Grant Reviewer Note
 
-Demo video coming soon.
-
-Recommended 60-90 second structure:
-
-- 0-10s: Problem - logistics dispatch is still manual and fragmented.
-- 10-25s: Select a shipment request.
-- 25-40s: Agents fetch GPS, route, economics and risk data.
-- 40-55s: App recommends BOOK / SKIP.
-- 55-70s: Paid Agent Run shows USDC cost, tx hash and Arc proof.
-- 70-90s: Explain why Arc + Circle enable machine-to-machine agent payments.
+Arc AI Logistics is currently a live demo and grant-ready prototype. The next step is to replace the demo/testnet proof layer with real Arc testnet settlement and Circle Developer Controlled Wallet powered USDC payments for agent execution.
