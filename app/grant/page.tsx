@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const milestones = [
   {
     title: "Real Arc Testnet settlement for paid agent runs",
@@ -83,10 +85,13 @@ export default function GrantPage() {
       <section className="space-y-4">
         <h2 className="text-2xl font-bold">Architecture</h2>
         <div className="border border-gray-200 p-3">
-          <img
+          <Image
             className="w-full border border-gray-100"
             src="/images/Arc_GPS_plan.png"
             alt="AI Agent System Architecture"
+            width={1536}
+            height={864}
+            priority
           />
         </div>
         <p className="text-sm text-gray-600">
