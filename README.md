@@ -40,29 +40,43 @@ The current demo includes:
 - Agent Payment Ledger
 - On-chain proof / tx hash display
 
-## Grant Milestones
+## Roadmap / Grant Milestones
 
-1. Real Arc Testnet settlement for paid agent runs
-   - Replace simulated tx proof with real Arc testnet transaction flow.
-   - Store tx hash and explorer link per agent run.
+### Milestone 1 — Live AI Logistics Demo
+Status: COMPLETE
 
-2. Circle Developer Controlled Wallet integration
-   - Programmatic wallet creation/management.
-   - USDC payments for agent execution.
+Built and deployed a working public demo of an AI-powered logistics dispatcher.
+The current demo includes shipment selection, map view, agent cards, route/economics/risk analysis, BOOK/SKIP recommendation, and a paid agent run panel.
 
-3. Agent Payment Ledger
-   - Track per-agent micro-payments.
-   - Show total paid per run.
-   - Prepare for nanopayment-style settlement.
+### Milestone 2 — Agent Payment Ledger
+Status: COMPLETE
 
-4. Multi-shipment autonomous optimization
-   - Let agents compare several shipment requests.
-   - Select the best one based on ETA, profit, risk and location.
+Added a USDC-denominated ledger for the agent run.
+The UI now shows per-agent execution costs for GPS, Route, Economics, and Risk agents, plus the total agent run cost of 0.005 USDC.
 
-5. Public demo and grant-ready documentation
-   - Improve /grant page.
-   - Add short demo video.
-   - Prepare the project for Circle/Arc ecosystem review.
+### Milestone 3 — Grant-Ready Public Pitch
+Status: COMPLETE
+
+Added project positioning, architecture diagram, /grant page, Circle/Arc framing, and demo video outline.
+The project now has a clearer public explanation for ecosystem reviewers and grant submission.
+
+### Milestone 4 — Real Arc Testnet Settlement
+Status: NEXT
+
+Replace the current demo/testnet-style transaction proof with real Arc testnet settlement.
+Each paid agent run should produce a real transaction hash and explorer-confirmed proof.
+
+### Milestone 5 — Circle Developer Controlled Wallet Integration
+Status: NEXT
+
+Integrate Circle Developer Controlled Wallets for programmatic USDC payments.
+The goal is to let the Payment Agent initiate and track agent payments securely without exposing private keys.
+
+### Milestone 6 — Autonomous Multi-Shipment Optimization
+Status: NEXT
+
+Extend the demo from analyzing one selected shipment to comparing multiple shipment requests automatically.
+Agents should rank opportunities by distance, ETA, profit, risk, and truck availability, then recommend the best load.
 
 ## Tech Stack
 
