@@ -3,34 +3,35 @@ import Link from "next/link";
 
 const milestones = [
   {
-    title: "Real Arc Testnet settlement for paid agent runs",
-    body: "Replace simulated tx proof with real Arc testnet transaction flow. Store tx hash and explorer link per agent run.",
+    title: "Milestone 1 — Live AI Logistics Demo",
+    status: "COMPLETE",
+    body: "Built and deployed a working public demo of an AI-powered logistics dispatcher. The current demo includes shipment selection, map view, agent cards, route/economics/risk analysis, BOOK/SKIP recommendation, and a paid agent run panel.",
   },
   {
-    title: "Circle Developer Controlled Wallet integration",
-    body: "Programmatic wallet creation and management. USDC payments for agent execution.",
+    title: "Milestone 2 — Agent Payment Ledger",
+    status: "COMPLETE",
+    body: "Added a USDC-denominated ledger for the agent run. The UI now shows per-agent execution costs for GPS, Route, Economics, and Risk agents, plus the total agent run cost of 0.005 USDC.",
   },
   {
-    title: "Agent Payment Ledger",
-    body: "Track per-agent micro-payments, show total paid per run, and prepare for nanopayment-style settlement.",
+    title: "Milestone 3 — Grant-Ready Public Pitch",
+    status: "COMPLETE",
+    body: "Added project positioning, architecture diagram, /grant page, Circle/Arc framing, and demo video outline. The project now has a clearer public explanation for ecosystem reviewers and grant submission.",
   },
   {
-    title: "Multi-shipment autonomous optimization",
-    body: "Let agents compare several shipment requests and select the best one based on ETA, profit, risk and location.",
+    title: "Milestone 4 — Real Arc Testnet Settlement",
+    status: "NEXT",
+    body: "Replace the current demo/testnet-style transaction proof with real Arc testnet settlement. Each paid agent run should produce a real transaction hash and explorer-confirmed proof.",
   },
   {
-    title: "Public demo and grant-ready documentation",
-    body: "Improve the /grant page, add a short demo video, and prepare the project for Circle/Arc ecosystem review.",
+    title: "Milestone 5 — Circle Developer Controlled Wallet Integration",
+    status: "NEXT",
+    body: "Integrate Circle Developer Controlled Wallets for programmatic USDC payments. The goal is to let the Payment Agent initiate and track agent payments securely without exposing private keys.",
   },
-];
-
-const videoPlan = [
-  "0-10s: Problem - logistics dispatch is still manual and fragmented.",
-  "10-25s: Select a shipment request.",
-  "25-40s: Agents fetch GPS, route, economics and risk data.",
-  "40-55s: App recommends BOOK / SKIP.",
-  "55-70s: Paid Agent Run shows USDC cost, tx hash and Arc proof.",
-  "70-90s: Explain why Arc + Circle enable machine-to-machine agent payments.",
+  {
+    title: "Milestone 6 — Autonomous Multi-Shipment Optimization",
+    status: "NEXT",
+    body: "Extend the demo from analyzing one selected shipment to comparing multiple shipment requests automatically. Agents should rank opportunities by distance, ETA, profit, risk, and truck availability, then recommend the best load.",
+  },
 ];
 
 export default function GrantPage() {
@@ -144,13 +145,13 @@ export default function GrantPage() {
       <section className="space-y-4">
         <h2 className="text-2xl font-bold">Roadmap / Grant Milestones</h2>
         <div className="space-y-3">
-          {milestones.map((milestone, index) => (
+          {milestones.map((milestone) => (
             <div className="border border-gray-200 p-4" key={milestone.title}>
-              <p className="text-sm font-semibold text-gray-500">
-                Milestone {index + 1}
-              </p>
               <h3 className="font-bold">{milestone.title}</h3>
-              <p className="text-sm text-gray-700">{milestone.body}</p>
+              <p className="text-sm font-semibold text-gray-500">
+                Status: {milestone.status}
+              </p>
+              <p className="mt-2 text-sm text-gray-700">{milestone.body}</p>
             </div>
           ))}
         </div>
@@ -158,12 +159,17 @@ export default function GrantPage() {
 
       <section className="space-y-3 border border-gray-200 p-5">
         <h2 className="text-2xl font-bold">Demo Video</h2>
-        <p className="font-semibold">Demo video coming soon.</p>
-        <ul className="list-disc space-y-2 pl-5 text-gray-700">
-          {videoPlan.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
+        <p className="text-gray-700">
+          Short walkthrough of Arc AI Logistics — a multi-agent freight coordination demo powered by Circle and Arc.
+        </p>
+        <p className="text-gray-700">
+          The video demonstrates how AI agents evaluate shipment opportunities using GPS data, route intelligence, economics, and risk analysis, then coordinate a USDC-denominated paid agent run with on-chain proof simulation.
+        </p>
+        <video
+          className="aspect-video w-full rounded-lg border border-gray-200"
+          src="/demo/arc-ai-logistics-demo.mp4"
+          controls
+        />
       </section>
     </main>
   );
