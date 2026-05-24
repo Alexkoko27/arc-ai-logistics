@@ -97,7 +97,7 @@ Never commit `.env.local` or API keys.
 
 ## Demo Video
 
-Demo video coming soon.
+Demo video: https://arc-ai-logistics.vercel.app/demo/arc-ai-logistics-demo.mp4
 
 Recommended 60-90 second structure:
 
