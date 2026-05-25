@@ -28,14 +28,14 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-white text-black">
-        <header className="border-b border-gray-200 px-6 py-3 text-sm">
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
+      <body className="flex min-h-full flex-col bg-background text-foreground">
+        <header className="border-b border-gray-200 px-4 py-3 text-sm sm:px-6">
+          <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <span className="font-semibold uppercase tracking-wide text-gray-700">
               Live Testnet Demo Project
             </span>
             <a
-              className="text-gray-700 underline-offset-4 hover:underline"
+              className="w-fit text-gray-700 underline-offset-4 hover:underline"
               href="https://x.com/AlexandrB27"
               target="_blank"
               rel="noopener noreferrer"
@@ -45,7 +45,7 @@ export default function RootLayout({
           </div>
         </header>
         <div className="flex-1">{children}</div>
-        <footer className="border-t border-gray-200 px-6 py-5 text-center text-sm text-gray-500">
+        <footer className="border-t border-gray-200 px-4 py-5 text-center text-sm text-gray-500 sm:px-6">
           Powered by{" "}
           <a
             className="font-medium text-gray-700 underline-offset-4 hover:underline"
