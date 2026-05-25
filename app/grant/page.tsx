@@ -210,7 +210,7 @@ export default function GrantPage() {
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-gray-50 p-5 shadow-sm sm:p-6">
-          <div className="mx-auto max-w-4xl space-y-4 text-center">
+          <div className="mx-auto max-w-3xl space-y-4 text-center">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Walkthrough
