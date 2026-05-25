@@ -27,6 +27,12 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+label:has(input:checked) {
+  background-color: #ecfdf5;
+  border-color: #22c55e;
+  color: #111827;
+}
+
 @media (prefers-color-scheme: dark) {
   .bg-white,
   .bg-gray-50,
@@ -64,6 +70,24 @@ body {
   .border-red-300,
   .border-green-500 {
     border-color: #2f3033 !important;
+  }
+
+  label:has(input:checked) {
+    background-color: #08251a !important;
+    border-color: #34d399 !important;
+    color: #f8fafc !important;
+  }
+
+  label:has(input:checked) .text-gray-500,
+  label:has(input:checked) .text-gray-600,
+  label:has(input:checked) .text-gray-700,
+  label:has(input:checked) span,
+  label:has(input:checked) p {
+    color: #f8fafc !important;
+  }
+
+  label:has(input:checked) input {
+    accent-color: #34d399;
   }
 
   .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
