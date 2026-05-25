@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import MapView from "@/components/MapView";
 
 type Coordinates = {
@@ -253,12 +254,12 @@ export default function Home() {
             </p>
             <h1 className="text-3xl font-bold">Dispatcher Agent Control Center</h1>
           </div>
-          <a
+          <Link
             className="text-sm font-semibold underline underline-offset-4"
             href="/grant"
           >
             Circle grant pitch
-          </a>
+          </Link>
         </div>
         <p className="max-w-3xl text-gray-600">
           Select one shipment request. The Fleet GPS, Route, Economics, and Risk
@@ -462,6 +463,23 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      <section className="border p-4 rounded-xl space-y-3">
+        <div className="space-y-1">
+          <h2 className="font-bold">Demo Video</h2>
+          <p className="text-sm text-gray-700">
+            Short walkthrough of Arc AI Logistics — a multi-agent freight coordination demo powered by Circle and Arc.
+          </p>
+          <p className="text-sm text-gray-600">
+            The video demonstrates how AI agents evaluate shipment opportunities using GPS data, route intelligence, economics, and risk analysis, then coordinate a USDC-denominated paid agent run with on-chain proof simulation.
+          </p>
+        </div>
+        <video
+          className="aspect-video w-full rounded-lg border border-gray-200 bg-black"
+          src="/demo/arc-ai-logistics-demo.mp4"
+          controls
+        />
+      </section>
     </main>
   );
 }
