@@ -245,14 +245,14 @@ export default function Home() {
   }
 
   return (
-    <main className="p-8 space-y-6">
+    <main className="space-y-6 p-4 sm:p-6 lg:p-8">
       <header className="space-y-2">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
             <p className="text-sm uppercase tracking-wide text-gray-500">
               Arc Testnet paid AI logistics demo
             </p>
-            <h1 className="text-3xl font-bold">Dispatcher Agent Control Center</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">Dispatcher Agent Control Center</h1>
           </div>
           <Link
             className="text-sm font-semibold underline underline-offset-4"
@@ -261,25 +261,25 @@ export default function Home() {
             Circle grant pitch
           </Link>
         </div>
-        <p className="max-w-3xl text-gray-600">
+        <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
           Select one shipment request. The Fleet GPS, Route, Economics, and Risk
           agents run as a paid analysis bundle. The demo charges {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet and returns an on-chain proof.
         </p>
       </header>
 
       {error && (
-        <div className="border border-red-300 bg-red-50 p-4 rounded-xl text-sm text-red-700">
+        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="border p-4 rounded-xl space-y-3">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="space-y-3 rounded-xl border p-4">
           <h2 className="font-bold">Shipment Requests</h2>
           <div className="space-y-3">
             {demoData?.shipments.map((shipment) => (
               <label
-                className="block border rounded-lg p-3 cursor-pointer has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
+                className="block cursor-pointer rounded-lg border p-3 has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
                 key={shipment.id}
               >
                 <input
@@ -291,7 +291,7 @@ export default function Home() {
                   onChange={() => selectShipment(shipment.id)}
                 />
                 <span className="font-semibold">{shipment.reference}</span>
-                <div className="mt-2 text-sm text-gray-600 space-y-1">
+                <div className="mt-2 space-y-1 text-sm text-gray-600">
                   <p>Lane: {formatLane(shipment.origin, shipment.destination)}</p>
                   <p>Commodity: {shipment.commodity}</p>
                   <p>Revenue: {shipment.revenue} {shipment.currency}</p>
@@ -302,7 +302,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="border p-4 rounded-xl space-y-3">
+        <div className="space-y-3 rounded-xl border p-4">
           <h2 className="font-bold">Selected Shipment Map</h2>
           {selectedShipment ? (
             <>
@@ -311,12 +311,12 @@ export default function Home() {
                 destination={selectedShipment.destination}
                 height={360}
               />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div className="bg-gray-50 rounded-lg p-3">
+              <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                <div className="rounded-lg bg-gray-50 p-3">
                   <p className="font-semibold">Origin</p>
                   <p>{formatLocation(selectedShipment.origin)}</p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="rounded-lg bg-gray-50 p-3">
                   <p className="font-semibold">Destination</p>
                   <p>{formatLocation(selectedShipment.destination)}</p>
                 </div>
@@ -328,7 +328,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border p-4 rounded-xl space-y-4">
+      <section className="space-y-4 rounded-xl border p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="font-bold">Paid Agent Run</h2>
@@ -339,7 +339,7 @@ export default function Home() {
           <button
             onClick={runAgents}
             disabled={isRunning || !selectedShipment}
-            className="bg-black text-white px-4 py-2 rounded disabled:cursor-not-allowed disabled:bg-gray-400"
+            className="rounded bg-black px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-400"
           >
             {isRunning
               ? "Running agents..."
@@ -349,7 +349,7 @@ export default function Home() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {selectedShipment && (
-            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+            <div className="space-y-1 rounded-lg bg-gray-50 p-3 text-sm">
               <p className="font-semibold">Selected shipment</p>
               <p>{selectedShipment.reference}</p>
               <p>{formatLane(selectedShipment.origin, selectedShipment.destination)}</p>
@@ -399,9 +399,9 @@ export default function Home() {
       </section>
 
       {run && (
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {run.agents.map((agent) => (
-            <div className="border p-4 rounded-xl space-y-2" key={agent.name}>
+            <div className="space-y-2 rounded-xl border p-4" key={agent.name}>
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-bold">{agent.name}</h3>
                 <span className="rounded bg-gray-100 px-2 py-1 text-xs uppercase">
@@ -409,7 +409,7 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-sm text-gray-700">{agent.summary}</p>
-              <pre className="text-xs bg-gray-50 p-3 rounded whitespace-pre-wrap overflow-auto">
+              <pre className="overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-3 text-xs">
                 {formatDetails(agent.details)}
               </pre>
             </div>
@@ -418,8 +418,8 @@ export default function Home() {
       )}
 
       {run && (
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="border p-4 rounded-xl space-y-2">
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="space-y-2 rounded-xl border p-4">
             <h2 className="font-bold">Recommendation</h2>
             <p className="text-2xl font-bold">{run.recommendation.decision}</p>
             <p>Confidence: {run.recommendation.confidence}%</p>
@@ -436,10 +436,10 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="border p-4 rounded-xl space-y-2 break-words">
+          <div className="space-y-2 break-words rounded-xl border p-4">
             <h2 className="font-bold">On-chain Proof</h2>
             {payment && (
-              <div className="text-sm space-y-1">
+              <div className="space-y-1 text-sm">
                 <p>Network: {payment.network}</p>
                 <p>Fee: {payment.amount} {payment.currency}</p>
                 <p>Transaction ID: {payment.transactionId}</p>
@@ -464,21 +464,23 @@ export default function Home() {
         </section>
       )}
 
-      <section className="border p-4 rounded-xl space-y-3">
-        <div className="space-y-1">
-          <h2 className="font-bold">Demo Video</h2>
-          <p className="text-sm text-gray-700">
-            Short walkthrough of Arc AI Logistics — a multi-agent freight coordination demo powered by Circle and Arc.
-          </p>
-          <p className="text-sm text-gray-600">
-            The video demonstrates how AI agents evaluate shipment opportunities using GPS data, route intelligence, economics, and risk analysis, then coordinate a USDC-denominated paid agent run with on-chain proof simulation.
-          </p>
+      <section className="rounded-xl border p-4 sm:p-5">
+        <div className="mx-auto max-w-3xl space-y-3">
+          <div className="space-y-1 text-center sm:text-left">
+            <h2 className="font-bold">Demo Video</h2>
+            <p className="text-sm text-gray-700">
+              Short walkthrough of Arc AI Logistics — a multi-agent freight coordination demo powered by Circle and Arc.
+            </p>
+            <p className="text-sm text-gray-600">
+              The video demonstrates how AI agents evaluate shipment opportunities using GPS data, route intelligence, economics, and risk analysis, then coordinate a USDC-denominated paid agent run with on-chain proof simulation.
+            </p>
+          </div>
+          <video
+            className="aspect-video w-full rounded-lg border border-gray-200 bg-black"
+            src="/demo/arc-ai-logistics-demo.mp4"
+            controls
+          />
         </div>
-        <video
-          className="aspect-video w-full rounded-lg border border-gray-200 bg-black"
-          src="/demo/arc-ai-logistics-demo.mp4"
-          controls
-        />
       </section>
     </main>
   );
