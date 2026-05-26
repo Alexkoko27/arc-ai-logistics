@@ -5,6 +5,8 @@ type RoutePoint = {
   lng: number;
 };
 
+const METERS_PER_MILE = 1609.344;
+
 function formatDuration(duration: string) {
   const seconds = Number(duration.replace("s", ""));
   const hours = Math.floor(seconds / 3600);
@@ -18,8 +20,11 @@ function toRadians(value: number) {
   return (value * Math.PI) / 180;
 }
 
-function estimateFallbackDistanceKm(origin: RoutePoint, destination: RoutePoint) {
-  const earthRadiusKm = 6371;
+export function estimateFallbackDistanceMiles(
+  origin: RoutePoint,
+  destination: RoutePoint,
+) {
+  const earthRadiusMiles = 3958.8;
   const deltaLat = toRadians(destination.lat - origin.lat);
   const deltaLng = toRadians(destination.lng - origin.lng);
   const lat1 = toRadians(origin.lat);
@@ -32,15 +37,15 @@ function estimateFallbackDistanceKm(origin: RoutePoint, destination: RoutePoint)
       Math.sin(deltaLng / 2) *
       Math.sin(deltaLng / 2);
 
-  const directDistanceKm =
-    earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const directDistanceMiles =
+    earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  return Number((directDistanceKm * 1.22).toFixed(1));
+  return Number((directDistanceMiles * 1.22).toFixed(1));
 }
 
-function estimateFallbackEta(distanceKm: number) {
-  const averageSpeedKmH = 72;
-  const totalMinutes = Math.round((distanceKm / averageSpeedKmH) * 60);
+function estimateFallbackEta(distanceMiles: number) {
+  const averageSpeedMph = 58;
+  const totalMinutes = Math.round((distanceMiles / averageSpeedMph) * 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
@@ -53,11 +58,11 @@ function fallbackRouteMetrics(
   destination: RoutePoint,
   source: string,
 ) {
-  const distanceKm = estimateFallbackDistanceKm(origin, destination);
+  const distanceMiles = estimateFallbackDistanceMiles(origin, destination);
 
   return {
-    distanceKm,
-    eta: estimateFallbackEta(distanceKm),
+    distanceMiles,
+    eta: estimateFallbackEta(distanceMiles),
     source,
   };
 }
@@ -104,7 +109,7 @@ export async function getRouteMetrics(
           routingPreference: "TRAFFIC_AWARE",
           computeAlternativeRoutes: false,
           languageCode: "en-US",
-          units: "METRIC",
+          units: "IMPERIAL",
         }),
       },
     );
@@ -129,7 +134,7 @@ export async function getRouteMetrics(
     }
 
     return {
-      distanceKm: Number((route.distanceMeters / 1000).toFixed(1)),
+      distanceMiles: Number((route.distanceMeters / METERS_PER_MILE).toFixed(1)),
       eta: formatDuration(route.duration),
       encodedPolyline: route.polyline?.encodedPolyline,
       source: "google-routes",
