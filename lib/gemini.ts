@@ -1,13 +1,42 @@
 import { GoogleGenAI } from "@google/genai";
 
-export async function analyzeRouteWithGemini(
-  distanceKm: number,
-  eta: string,
-  profit: number,
-) {
+type GeminiTruckingInput = {
+  deadheadMiles: number;
+  loadedMiles: number;
+  totalMiles: number;
+  revenue: number;
+  fuelCost: number;
+  driverCost: number;
+  grossProfit: number;
+  marginPercent: number;
+  rpmLoaded: number;
+  rpmTotal: number;
+  riskScore: number;
+};
+
+function fallbackDecision(input: GeminiTruckingInput) {
+  if (
+    input.grossProfit > 350 &&
+    input.marginPercent >= 15 &&
+    input.rpmTotal >= 1.75 &&
+    input.riskScore < 60
+  ) {
+    return "BOOK";
+  }
+
+  if (input.grossProfit > 100 && input.rpmTotal >= 1.35 && input.riskScore < 75) {
+    return "WAIT";
+  }
+
+  return "SKIP";
+}
+
+export async function analyzeRouteWithGemini(input: GeminiTruckingInput) {
+  const fallbackRecommendation = fallbackDecision(input);
+
   if (!process.env.GEMINI_API_KEY) {
     return {
-      recommendation: profit > 100 ? "BOOK" : "SKIP",
+      recommendation: fallbackRecommendation,
       confidence: 65,
       reason: "Fallback rule used because GEMINI_API_KEY is missing.",
       source: "fallback",
@@ -20,18 +49,26 @@ export async function analyzeRouteWithGemini(
     });
 
     const prompt = `
-You are a logistics AI agent.
+You are a US trucking dispatch AI agent.
 
-Analyze:
-Distance: ${distanceKm} km
-ETA: ${eta}
-Profit: ${profit} USD
+Analyze this dry van load match using miles and USDC/USD economics:
+Deadhead miles: ${input.deadheadMiles}
+Loaded miles: ${input.loadedMiles}
+Total miles: ${input.totalMiles}
+Revenue: ${input.revenue} USDC
+Fuel cost: ${input.fuelCost} USDC
+Driver cost: ${input.driverCost} USDC
+Gross profit: ${input.grossProfit} USDC
+Margin percent: ${input.marginPercent}%
+RPM loaded: ${input.rpmLoaded} USDC/mile
+RPM total: ${input.rpmTotal} USDC/mile
+Risk score: ${input.riskScore}/100
 
 Return JSON only:
 {
-  "recommendation": "BOOK or SKIP",
+  "recommendation": "BOOK" | "WAIT" | "SKIP",
   "confidence": 0-100,
-  "reason": "short reason"
+  "reason": "short dispatch reason"
 }
 `;
 
@@ -49,7 +86,7 @@ Return JSON only:
     };
   } catch {
     return {
-      recommendation: profit > 100 ? "BOOK" : "SKIP",
+      recommendation: fallbackRecommendation,
       confidence: 55,
       reason: "Fallback rule used because AI analysis failed.",
       source: "fallback",
