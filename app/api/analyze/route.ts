@@ -4,28 +4,25 @@ import { analyzeRouteWithGemini } from "@/lib/gemini";
 import { getRouteMetrics } from "@/lib/googleRoutes";
 
 export async function GET() {
-  let route;
+  const route = await getRouteMetrics();
+  const profitData = calculateProfit(route.distanceMiles);
 
-  try {
-    route = await getRouteMetrics();
-  } catch {
-    route = {
-      distanceKm: 289,
-      eta: "3h 45m",
-      source: "fallback",
-    };
-  }
-
-  const profitData = calculateProfit(route.distanceKm);
-
-  const aiResult = await analyzeRouteWithGemini(
-    route.distanceKm,
-    route.eta,
-    profitData.profit,
-  );
+  const aiResult = await analyzeRouteWithGemini({
+    deadheadMiles: 0,
+    loadedMiles: route.distanceMiles,
+    totalMiles: route.distanceMiles,
+    revenue: profitData.revenue,
+    fuelCost: profitData.fuelCost,
+    driverCost: profitData.driverCost,
+    grossProfit: profitData.profit,
+    marginPercent: Number(((profitData.profit / profitData.revenue) * 100).toFixed(1)),
+    rpmLoaded: Number((profitData.revenue / Math.max(route.distanceMiles, 1)).toFixed(2)),
+    rpmTotal: Number((profitData.revenue / Math.max(route.distanceMiles, 1)).toFixed(2)),
+    riskScore: profitData.profit > 100 ? 35 : 70,
+  });
 
   return NextResponse.json({
-    distance: route.distanceKm,
+    distanceMiles: route.distanceMiles,
     eta: route.eta,
     routeSource: route.source,
     encodedPolyline: "encodedPolyline" in route ? route.encodedPolyline : null,
