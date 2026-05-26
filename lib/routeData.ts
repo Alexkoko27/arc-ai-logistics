@@ -1,11 +1,11 @@
 export const truckLocation = {
-  lat: 52.52,
-  lng: 13.405,
-  city: "Berlin",
+  lat: 32.7767,
+  lng: -96.797,
+  city: "Dallas",
 };
 
 export const cargoLocation = {
-  lat: 53.5511,
-  lng: 9.9937,
-  city: "Hamburg",
+  lat: 41.8781,
+  lng: -87.6298,
+  city: "Chicago",
 };
