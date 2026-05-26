@@ -277,9 +277,12 @@ function createLocalMatch(vehicle: Vehicle, shipment: Shipment): RankedTruckLoad
 
 export function compareAllTruckLoadMatches() {
   return shipments
-    .flatMap((shipment) =>
-      vehicles.map((vehicle) => createLocalMatch(vehicle, shipment)),
+    .map((shipment) =>
+      vehicles
+        .map((vehicle) => createLocalMatch(vehicle, shipment))
+        .sort((a, b) => b.rankScore - a.rankScore)[0],
     )
+    .filter((match): match is RankedTruckLoadMatch => Boolean(match))
     .sort((a, b) => b.rankScore - a.rankScore);
 }
 
