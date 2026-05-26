@@ -170,7 +170,7 @@ const agentPaymentLedger = [
 ];
 
 const totalAgentPayment = "0.005 USDC";
-const demoVersion = "Testnet Live Demo • V 0.0.2 • 2026-05-26 06:41 UTC";
+const demoVersion = "Testnet Live Demo - V 0.0.2 - 2026-05-26 06:41 UTC";
 
 function formatLocation(location: Coordinates) {
   return `${location.city}, ${location.state}`;
@@ -178,6 +178,10 @@ function formatLocation(location: Coordinates) {
 
 function formatLane(origin: Coordinates, destination: Coordinates) {
   return `${formatLocation(origin)} -> ${formatLocation(destination)}`;
+}
+
+function formatMatchLane(match: RankedTruckLoadMatch) {
+  return `${match.origin} -> ${match.destination}`;
 }
 
 function formatWindow(startIso: string, endIso: string) {
@@ -621,7 +625,7 @@ export default function Home() {
                 <tr key={`${match.shipmentId}-${match.truckId}`}>
                   <td className="py-2 pr-3 font-semibold">{match.loadReference}</td>
                   <td className="py-2 pr-3">{match.truckLabel}</td>
-                  <td className="py-2 pr-3">{match.origin} -> {match.destination}</td>
+                  <td className="py-2 pr-3">{formatMatchLane(match)}</td>
                   <td className="py-2 pr-3">{match.economics.deadheadMiles}</td>
                   <td className="py-2 pr-3">{match.economics.loadedMiles}</td>
                   <td className="py-2 pr-3">{match.economics.totalMiles}</td>
@@ -644,7 +648,7 @@ export default function Home() {
           <div className="space-y-1 text-center sm:text-left">
             <h2 className="font-bold">Demo Video</h2>
             <p className="text-sm text-gray-700">
-              Short walkthrough of Arc AI Logistics — a multi-agent freight coordination demo powered by Circle and Arc.
+              Short walkthrough of Arc AI Logistics - a multi-agent freight coordination demo powered by Circle and Arc.
             </p>
             <p className="text-sm text-gray-600">
               The video demonstrates how AI agents evaluate shipment opportunities using GPS data, route intelligence, economics, and risk analysis, then coordinate a USDC-denominated paid agent run with on-chain proof simulation.
