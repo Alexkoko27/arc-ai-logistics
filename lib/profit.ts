@@ -1,7 +1,7 @@
-export function calculateProfit(distanceKm: number) {
+export function calculateProfit(distanceMiles: number) {
   const freightRevenue = 500;
-  const fuelCost = distanceKm * 0.35;
-  const driverCost = distanceKm * 0.12;
+  const fuelCost = distanceMiles * 0.58;
+  const driverCost = distanceMiles * 0.7;
 
   const profit = freightRevenue - fuelCost - driverCost;
 
