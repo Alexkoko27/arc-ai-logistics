@@ -36,6 +36,10 @@ The current demo is testnet-oriented and demonstrates how agent execution can be
 
 AI Agent System: GPS, shipment, route, economics, risk, and payment agents coordinate freight decisions and prepare paid agent runs through Circle + Arc infrastructure.
 
+## Project Notes
+
+- [Future architecture notes](docs/FUTURE_IDEAS.md) — deferred ideas, resilience scenarios, AI provider abstraction, emergency dispatch mode, and future marketplace concepts.
+
 ## Why Arc + Circle
 
 Arc is a stablecoin-native blockchain environment suited for programmable settlement. For this project, Arc is the target infrastructure for agent payment proof, testnet settlement, and future machine-to-machine commerce between logistics services.
