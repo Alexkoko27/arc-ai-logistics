@@ -4,23 +4,27 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import MapView from "@/components/MapView";
 
+type LocationState = "Texas" | "Illinois" | "Georgia";
+
 type Coordinates = {
   lat: number;
   lng: number;
   city: string;
-  country: string;
+  state: LocationState;
+  country: "USA";
 };
 
 type Vehicle = {
   id: string;
   label: string;
   driver: string;
-  equipment: string;
+  equipment: "Dry Van";
   status: string;
   location: Coordinates;
-  preferredLane: string;
-  hoursUntilAvailable: number;
-  costPerKm: number;
+  availableAt: string;
+  mpg: number;
+  driverRatePerMile: number;
+  preferredLanes: string[];
 };
 
 type Shipment = {
@@ -30,10 +34,14 @@ type Shipment = {
   origin: Coordinates;
   destination: Coordinates;
   commodity: string;
-  weightKg: number;
+  weightLbs: number;
   revenue: number;
-  currency: "USDC" | "EURC";
-  pickupWindow: string;
+  currency: "USDC";
+  pickupWindowStart: string;
+  pickupWindowEnd: string;
+  deliveryWindowStart: string;
+  deliveryWindowEnd: string;
+  equipment: "Dry Van";
 };
 
 type AgentResult = {
@@ -43,19 +51,30 @@ type AgentResult = {
   details: Record<string, string | number | boolean>;
 };
 
+type Economics = {
+  revenue: number;
+  deadheadMiles: number;
+  loadedMiles: number;
+  totalMiles: number;
+  fuelPricePerGallon: number;
+  fuelGallons: number;
+  fuelCost: number;
+  driverCost: number;
+  operatingCost: number;
+  grossProfit: number;
+  rpmLoaded: number;
+  rpmTotal: number;
+  marginPercent: number;
+  currency: "USDC";
+};
+
 type AgentRun = {
   id: string;
   vehicle: Vehicle;
   shipment: Shipment;
   agents: AgentResult[];
-  economics: {
-    distanceKm: number;
+  economics: Economics & {
     eta: string;
-    revenue: number;
-    operatingCost: number;
-    grossProfit: number;
-    marginPercent: number;
-    currency: "USDC" | "EURC";
     routeSource: string;
   };
   risk: {
@@ -76,8 +95,33 @@ type AgentRun = {
   };
 };
 
+type RankedTruckLoadMatch = {
+  loadReference: string;
+  shipmentId: string;
+  truckId: string;
+  truckLabel: string;
+  origin: string;
+  destination: string;
+  economics: Economics;
+  risk: {
+    level: "low" | "medium" | "high";
+    score: number;
+    factors: string[];
+  };
+  recommendation: {
+    decision: "BOOK" | "WAIT" | "SKIP";
+    confidence: number;
+    reason: string;
+    source: string;
+  };
+  feasible: boolean;
+  rankScore: number;
+};
+
 type DemoDataResponse = {
+  vehicles: Vehicle[];
   shipments: Shipment[];
+  comparisons: RankedTruckLoadMatch[];
   agentFee: {
     amount: string;
     currency: "USDC";
@@ -126,13 +170,33 @@ const agentPaymentLedger = [
 ];
 
 const totalAgentPayment = "0.005 USDC";
+const demoLabel = "TESTNET LIVE DEMO -";
+const demoVersion = "V 0.0.2 - 2026-05-26 06:41 UTC";
 
 function formatLocation(location: Coordinates) {
-  return `${location.city}, ${location.country}`;
+  return `${location.city}, ${location.state}`;
 }
 
 function formatLane(origin: Coordinates, destination: Coordinates) {
   return `${formatLocation(origin)} -> ${formatLocation(destination)}`;
+}
+
+function formatMatchLane(match: RankedTruckLoadMatch) {
+  return `${match.origin} -> ${match.destination}`;
+}
+
+function formatWindow(startIso: string, endIso: string) {
+  const options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  };
+  const start = new Intl.DateTimeFormat("en-US", options).format(new Date(startIso));
+  const end = new Intl.DateTimeFormat("en-US", options).format(new Date(endIso));
+
+  return `${start} - ${end} UTC`;
 }
 
 function formatDetails(details: AgentResult["details"]) {
@@ -144,6 +208,7 @@ function formatDetails(details: AgentResult["details"]) {
 export default function Home() {
   const [demoData, setDemoData] = useState<DemoDataResponse | null>(null);
   const [selectedShipmentId, setSelectedShipmentId] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [run, setRun] = useState<AgentRun | null>(null);
   const [payment, setPayment] = useState<PaymentResponse | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<
@@ -158,8 +223,9 @@ export default function Home() {
       .then((data: DemoDataResponse) => {
         setDemoData(data);
         setSelectedShipmentId(data.shipments[0]?.id ?? "");
+        setSelectedVehicleId(data.vehicles[0]?.id ?? "");
       })
-      .catch(() => setError("Unable to load dispatcher demo data."));
+      .catch(() => setError("Unable to load US trucking demo data."));
   }, []);
 
   const selectedShipment = useMemo(
@@ -168,6 +234,12 @@ export default function Home() {
         (shipment) => shipment.id === selectedShipmentId,
       ) ?? null,
     [demoData, selectedShipmentId],
+  );
+
+  const selectedVehicle = useMemo(
+    () =>
+      demoData?.vehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null,
+    [demoData, selectedVehicleId],
   );
 
   const proofHash = paymentStatus?.txHash ?? payment?.txHash ?? null;
@@ -193,16 +265,25 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [payment?.transactionId, paymentStatus?.terminal]);
 
-  function selectShipment(shipmentId: string) {
-    setSelectedShipmentId(shipmentId);
+  function resetRunState() {
     setRun(null);
     setPayment(null);
     setPaymentStatus(null);
     setError(null);
   }
 
+  function selectShipment(shipmentId: string) {
+    setSelectedShipmentId(shipmentId);
+    resetRunState();
+  }
+
+  function selectVehicle(vehicleId: string) {
+    setSelectedVehicleId(vehicleId);
+    resetRunState();
+  }
+
   async function runAgents() {
-    if (!selectedShipmentId) return;
+    if (!selectedShipmentId || !selectedVehicleId) return;
 
     setIsRunning(true);
     setError(null);
@@ -218,6 +299,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           shipmentId: selectedShipmentId,
+          vehicleId: selectedVehicleId,
         }),
       });
       const data = (await response.json()) as AgentRunResponse;
@@ -250,7 +332,11 @@ export default function Home() {
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
             <p className="text-sm uppercase tracking-wide text-gray-500">
-              Arc Testnet paid AI logistics demo
+              US trucking paid AI logistics demo
+            </p>
+            <p className="text-sm font-semibold uppercase tracking-wide sm:text-base">
+              <span>{demoLabel}</span>{" "}
+              <span className="text-red-600">{demoVersion}</span>
             </p>
             <h1 className="text-2xl font-bold sm:text-3xl">Dispatcher Agent Control Center</h1>
           </div>
@@ -262,8 +348,10 @@ export default function Home() {
           </Link>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
-          Select one shipment request. The Fleet GPS, Route, Economics, and Risk
-          agents run as a paid analysis bundle. The demo charges {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet and returns an on-chain proof.
+          Select one US dry van truck and one load. The Fleet GPS, Route,
+          Economics, and Risk agents run as a paid trucking analysis bundle. The
+          demo charges {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet
+          and returns an on-chain proof.
         </p>
       </header>
 
@@ -273,10 +361,39 @@ export default function Home() {
         </div>
       )}
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="space-y-3 rounded-xl border p-4">
-          <h2 className="font-bold">Shipment Requests</h2>
+          <h2 className="font-bold">Demo Trucks</h2>
           <div className="space-y-3">
+            {demoData?.vehicles.map((vehicle) => (
+              <label
+                className="block cursor-pointer rounded-lg border p-3 has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
+                key={vehicle.id}
+              >
+                <input
+                  className="mr-2"
+                  type="radio"
+                  name="vehicle"
+                  value={vehicle.id}
+                  checked={selectedVehicleId === vehicle.id}
+                  onChange={() => selectVehicle(vehicle.id)}
+                />
+                <span className="font-semibold">{vehicle.label}</span>
+                <div className="mt-2 space-y-1 text-sm text-gray-600">
+                  <p>Driver: {vehicle.driver}</p>
+                  <p>Location: {formatLocation(vehicle.location)}</p>
+                  <p>Status: {vehicle.status}</p>
+                  <p>MPG: {vehicle.mpg} | Driver: ${vehicle.driverRatePerMile}/mile</p>
+                  <p>Lanes: {vehicle.preferredLanes.join(", ")}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-xl border p-4 xl:col-span-2">
+          <h2 className="font-bold">Load Board</h2>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {demoData?.shipments.map((shipment) => (
               <label
                 className="block cursor-pointer rounded-lg border p-3 has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
@@ -294,16 +411,20 @@ export default function Home() {
                 <div className="mt-2 space-y-1 text-sm text-gray-600">
                   <p>Lane: {formatLane(shipment.origin, shipment.destination)}</p>
                   <p>Commodity: {shipment.commodity}</p>
+                  <p>Weight: {shipment.weightLbs.toLocaleString()} lbs</p>
                   <p>Revenue: {shipment.revenue} {shipment.currency}</p>
-                  <p>Pickup: {shipment.pickupWindow}</p>
+                  <p>Pickup: {formatWindow(shipment.pickupWindowStart, shipment.pickupWindowEnd)}</p>
+                  <p>Delivery: {formatWindow(shipment.deliveryWindowStart, shipment.deliveryWindowEnd)}</p>
                 </div>
               </label>
             ))}
           </div>
         </div>
+      </section>
 
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-xl border p-4">
-          <h2 className="font-bold">Selected Shipment Map</h2>
+          <h2 className="font-bold">Selected Load Map</h2>
           {selectedShipment ? (
             <>
               <MapView
@@ -313,11 +434,11 @@ export default function Home() {
               />
               <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <p className="font-semibold">Origin</p>
+                  <p className="font-semibold">Pickup</p>
                   <p>{formatLocation(selectedShipment.origin)}</p>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <p className="font-semibold">Destination</p>
+                  <p className="font-semibold">Delivery</p>
                   <p>{formatLocation(selectedShipment.destination)}</p>
                 </div>
               </div>
@@ -326,37 +447,44 @@ export default function Home() {
             <p className="text-sm text-gray-500">Loading map...</p>
           )}
         </div>
-      </section>
 
-      <section className="space-y-4 rounded-xl border p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="font-bold">Paid Agent Run</h2>
-            <p className="text-sm text-gray-600">
-              Fee: {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet.
-            </p>
-          </div>
-          <button
-            onClick={runAgents}
-            disabled={isRunning || !selectedShipment}
-            className="rounded bg-black px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-400"
-          >
-            {isRunning
-              ? "Running agents..."
-              : "Pay 0.005 USDC and analyze shipment"}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {selectedShipment && (
-            <div className="space-y-1 rounded-lg bg-gray-50 p-3 text-sm">
-              <p className="font-semibold">Selected shipment</p>
-              <p>{selectedShipment.reference}</p>
-              <p>{formatLane(selectedShipment.origin, selectedShipment.destination)}</p>
-              <p>Revenue: {selectedShipment.revenue} {selectedShipment.currency}</p>
-              <p>Pickup: {selectedShipment.pickupWindow}</p>
+        <div className="space-y-4 rounded-xl border p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="font-bold">Paid Agent Run</h2>
+              <p className="text-sm text-gray-600">
+                Fee: {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet.
+              </p>
             </div>
-          )}
+            <button
+              onClick={runAgents}
+              disabled={isRunning || !selectedShipment || !selectedVehicle}
+              className="rounded bg-black px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-400"
+            >
+              {isRunning
+                ? "Running agents..."
+                : "Pay 0.005 USDC and analyze load"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+            {selectedVehicle && (
+              <div className="space-y-1 rounded-lg bg-gray-50 p-3">
+                <p className="font-semibold">Selected truck</p>
+                <p>{selectedVehicle.label}</p>
+                <p>{formatLocation(selectedVehicle.location)}</p>
+                <p>Available: {formatWindow(selectedVehicle.availableAt, selectedVehicle.availableAt)}</p>
+              </div>
+            )}
+            {selectedShipment && (
+              <div className="space-y-1 rounded-lg bg-gray-50 p-3">
+                <p className="font-semibold">Selected load</p>
+                <p>{selectedShipment.reference}</p>
+                <p>{formatLane(selectedShipment.origin, selectedShipment.destination)}</p>
+                <p>Revenue: {selectedShipment.revenue} {selectedShipment.currency}</p>
+              </div>
+            )}
+          </div>
 
           <div className="rounded-lg border border-gray-200 p-3 text-sm">
             <div className="flex items-start justify-between gap-3 border-b border-gray-200 pb-2">
@@ -426,12 +554,16 @@ export default function Home() {
             <p>Source: {run.recommendation.source}</p>
             <p className="text-sm text-gray-700">{run.recommendation.reason}</p>
             <div className="text-sm text-gray-600">
-              <p>Distance: {run.economics.distanceKm} km</p>
+              <p>Deadhead: {run.economics.deadheadMiles} miles</p>
+              <p>Loaded: {run.economics.loadedMiles} miles</p>
+              <p>Total: {run.economics.totalMiles} miles</p>
               <p>ETA: {run.economics.eta}</p>
               <p>Route source: {run.economics.routeSource}</p>
-              <p>
-                Gross profit: {run.economics.grossProfit} {run.economics.currency}
-              </p>
+              <p>Fuel: {run.economics.fuelCost} {run.economics.currency}</p>
+              <p>Driver: {run.economics.driverCost} {run.economics.currency}</p>
+              <p>Gross profit: {run.economics.grossProfit} {run.economics.currency}</p>
+              <p>RPM loaded: {run.economics.rpmLoaded}</p>
+              <p>RPM total: {run.economics.rpmTotal}</p>
               <p>Risk: {run.risk.level} ({run.risk.score}/100)</p>
             </div>
           </div>
@@ -464,12 +596,61 @@ export default function Home() {
         </section>
       )}
 
+      <section className="space-y-3 rounded-xl border p-4">
+        <div>
+          <h2 className="font-bold">Compare all loads</h2>
+          <p className="text-sm text-gray-600">
+            Ranked truck-load matches across 10 preset US dry van loads and 3 demo trucks.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-[1080px] w-full text-left text-xs">
+            <thead className="border-b border-gray-200 text-gray-500">
+              <tr>
+                <th className="py-2 pr-3">Load</th>
+                <th className="py-2 pr-3">Best truck</th>
+                <th className="py-2 pr-3">Lane</th>
+                <th className="py-2 pr-3">Deadhead</th>
+                <th className="py-2 pr-3">Loaded</th>
+                <th className="py-2 pr-3">Total</th>
+                <th className="py-2 pr-3">Revenue</th>
+                <th className="py-2 pr-3">Fuel</th>
+                <th className="py-2 pr-3">Driver</th>
+                <th className="py-2 pr-3">Profit</th>
+                <th className="py-2 pr-3">RPM L/T</th>
+                <th className="py-2 pr-3">Risk</th>
+                <th className="py-2 pr-3">Rec</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {demoData?.comparisons.slice(0, 10).map((match) => (
+                <tr key={`${match.shipmentId}-${match.truckId}`}>
+                  <td className="py-2 pr-3 font-semibold">{match.loadReference}</td>
+                  <td className="py-2 pr-3">{match.truckLabel}</td>
+                  <td className="py-2 pr-3">{formatMatchLane(match)}</td>
+                  <td className="py-2 pr-3">{match.economics.deadheadMiles}</td>
+                  <td className="py-2 pr-3">{match.economics.loadedMiles}</td>
+                  <td className="py-2 pr-3">{match.economics.totalMiles}</td>
+                  <td className="py-2 pr-3">{match.economics.revenue}</td>
+                  <td className="py-2 pr-3">{match.economics.fuelCost}</td>
+                  <td className="py-2 pr-3">{match.economics.driverCost}</td>
+                  <td className="py-2 pr-3">{match.economics.grossProfit}</td>
+                  <td className="py-2 pr-3">{match.economics.rpmLoaded}/{match.economics.rpmTotal}</td>
+                  <td className="py-2 pr-3">{match.risk.score}</td>
+                  <td className="py-2 pr-3 font-semibold">{match.recommendation.decision}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section className="rounded-xl border p-4 sm:p-5">
         <div className="mx-auto max-w-3xl space-y-3">
           <div className="space-y-1 text-center sm:text-left">
             <h2 className="font-bold">Demo Video</h2>
             <p className="text-sm text-gray-700">
-              Short walkthrough of Arc AI Logistics — a multi-agent freight coordination demo powered by Circle and Arc.
+              Short walkthrough of Arc AI Logistics - a multi-agent freight coordination demo powered by Circle and Arc.
             </p>
             <p className="text-sm text-gray-600">
               The video demonstrates how AI agents evaluate shipment opportunities using GPS data, route intelligence, economics, and risk analysis, then coordinate a USDC-denominated paid agent run with on-chain proof simulation.
