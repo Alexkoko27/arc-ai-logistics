@@ -82,10 +82,6 @@ function formatLocation(location: Shipment["origin"]) {
   return `${location.city}, ${location.state}`;
 }
 
-function hoursBetween(startIso: string, endIso: string) {
-  return (new Date(endIso).getTime() - new Date(startIso).getTime()) / 36e5;
-}
-
 function estimateTravelHours(totalMiles: number) {
   return totalMiles / 58;
 }
