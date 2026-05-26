@@ -170,7 +170,8 @@ const agentPaymentLedger = [
 ];
 
 const totalAgentPayment = "0.005 USDC";
-const demoVersion = "Testnet Live Demo - V 0.0.2 - 2026-05-26 06:41 UTC";
+const demoLabel = "TESTNET LIVE DEMO -";
+const demoVersion = "V 0.0.2 - 2026-05-26 06:41 UTC";
 
 function formatLocation(location: Coordinates) {
   return `${location.city}, ${location.state}`;
@@ -333,8 +334,9 @@ export default function Home() {
             <p className="text-sm uppercase tracking-wide text-gray-500">
               US trucking paid AI logistics demo
             </p>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              {demoVersion}
+            <p className="text-sm font-semibold uppercase tracking-wide sm:text-base">
+              <span>{demoLabel}</span>{" "}
+              <span className="text-red-600">{demoVersion}</span>
             </p>
             <h1 className="text-2xl font-bold sm:text-3xl">Dispatcher Agent Control Center</h1>
           </div>
