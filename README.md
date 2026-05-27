@@ -16,6 +16,27 @@ Arc AI Logistics is an agentic logistics coordination system where specialized A
 
 The current demo is testnet-oriented and demonstrates how agent execution can be priced in USDC and prepared for settlement on Arc using Circle infrastructure. It is designed as a grant-ready prototype for machine-to-machine payment flows in logistics, with the next milestone focused on real Arc testnet settlement and Circle Developer Controlled Wallet integration.
 
+## Core Product Principles
+
+Arc AI Logistics is designed around five core product principles:
+
+1. Real live data
+   The system should be able to fetch real operational data such as GPS/fleet location, shipment requests, route conditions, delivery status, and external logistics signals.
+
+2. Faster and cheaper economic calculation
+   AI agents should calculate profitability, route cost, delivery timing, and operational tradeoffs faster, cheaper, and more consistently than manual dispatch workflows.
+
+3. Option comparison
+   The system should compare multiple shipment and fleet options instead of analyzing only one load in isolation.
+
+4. Learning from past experience
+   Over time, the system should learn from previous routes, decisions, delays, costs, risks, and outcomes to improve future recommendations.
+
+5. Opportunity discovery and notifications
+   The system should suggest promising freight opportunities and notify users when a better load, route, or dispatch decision becomes available.
+
+These principles define the long-term direction of Arc AI Logistics: an AI-agent coordination system that helps transport operators find cargo, evaluate deals, reduce manual work, and improve delivery control.
+
 ## What The Demo Shows
 
 - Shipment request selection
@@ -73,6 +94,7 @@ Current status:
 - Agent Payment Ledger: COMPLETE
 - Grant pitch page: COMPLETE
 - Embedded demo video: COMPLETE
+- Core product principles documented: COMPLETE
 - Real Arc testnet settlement: NEXT
 - Circle Developer Controlled Wallet integration: NEXT
 - Autonomous multi-shipment optimization: NEXT
