@@ -6,6 +6,17 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: "v0.0.3a",
+    date: "2026-05-28 09:23 UTC",
+    changes: [
+      "Fixed NaN and null economics values",
+      "Improved route fallback handling",
+      "Added safe numeric guards",
+      "Improved recommendation robustness",
+      "Fixed partial route calculation edge cases",
+    ],
+  },
+  {
     version: "v0.0.3",
     date: "2026-05-28 08:39 UTC",
     changes: [
