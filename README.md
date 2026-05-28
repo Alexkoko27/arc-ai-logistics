@@ -12,7 +12,7 @@ AI agents for freight coordination, paid with USDC on Arc.
 
 Logistics dispatch is fragmented across GPS/fleet systems, routing tools, pricing inputs, risk checks, and payment workflows. Dispatchers often evaluate shipment opportunities manually, even when the decision depends on real-time location, route conditions, economics, and operational constraints.
 
-Arc AI Logistics is an agentic logistics coordination system where specialized AI agents evaluate freight opportunities and coordinate USDC-denominated paid agent runs using Arc + Circle infrastructure. The demo shows how GPS/Fleet, Route, Economics, and Risk agents can work together to produce a clear BOOK / SKIP recommendation for a shipment request.
+Arc AI Logistics is an agentic logistics coordination system where specialized AI agents evaluate freight opportunities and coordinate USDC-denominated paid agent runs using Arc + Circle infrastructure. The demo shows how GPS/Fleet, Route, Economics, Risk, Weather, and Historical Lane agents can work together to produce a clear BOOK / WAIT / SKIP recommendation for a shipment request.
 
 The current demo is testnet-oriented and demonstrates how agent execution can be priced in USDC and prepared for settlement on Arc using Circle infrastructure. It is designed as a grant-ready prototype for machine-to-machine payment flows in logistics, with the next milestone focused on real Arc testnet settlement and Circle Developer Controlled Wallet integration.
 
@@ -37,6 +37,27 @@ Arc AI Logistics is designed around five core product principles:
 
 These principles define the long-term direction of Arc AI Logistics: an AI-agent coordination system that helps transport operators find cargo, evaluate deals, reduce manual work, and improve delivery control.
 
+## Stage 1 MVP Scope
+
+Stage 1 MVP scope is completed in v0.0.3.
+
+The current demo includes:
+
+- US trucking preset demo data
+- 3 dry van trucks
+- 10 preset dry van loads
+- Miles-based routing and economics
+- Google Routes with fallback distance estimates
+- Server-side OpenWeather Risk Agent with fallback behavior
+- Preset/mock historical lane intelligence
+- State-based preset fuel prices
+- Detention, toll, and waiting cost estimates
+- True net profit and true margin calculations
+- Multi-load comparison
+- Why-ranked explanations
+- Risk-aware BOOK / WAIT / SKIP recommendations
+- Agent Payment Ledger and USDC-denominated paid agent run panel
+
 ## What The Demo Shows
 
 - Shipment request selection
@@ -45,7 +66,9 @@ These principles define the long-term direction of Arc AI Logistics: an AI-agent
 - Route Agent
 - Economics Agent
 - Risk Agent
-- BOOK / SKIP recommendation
+- Weather Risk Agent
+- Historical Lane Intelligence
+- BOOK / WAIT / SKIP recommendation
 - Agent Payment Ledger
 - USDC-denominated paid agent run
 - On-chain proof / testnet proof simulation
@@ -55,7 +78,7 @@ These principles define the long-term direction of Arc AI Logistics: an AI-agent
 
 ![AI Agent System Architecture](public/images/Arc_GPS_plan.png)
 
-AI Agent System: GPS, shipment, route, economics, risk, and payment agents coordinate freight decisions and prepare paid agent runs through Circle + Arc infrastructure.
+AI Agent System: GPS, shipment, route, economics, risk, weather, historical lane, and payment agents coordinate freight decisions and prepare paid agent runs through Circle + Arc infrastructure.
 
 ## Project Notes
 
@@ -69,7 +92,17 @@ USDC is used as the unit of account for agent execution. In the current demo, a 
 
 Circle Developer Controlled Wallets are the planned wallet layer for programmatic USDC payments. The goal is for a Payment Agent to initiate, track, and reconcile agent execution payments without exposing private keys to users or application code.
 
-Nanopayment-style flows are the target model for paying individual agent work units such as GPS checks, route analysis, economics calculations, and risk scoring. The current demo shows the workflow and testnet proof concept; the next milestone is real Arc testnet settlement.
+Nanopayment-style flows are the target model for paying individual agent work units such as GPS checks, route analysis, economics calculations, risk scoring, weather checks, and lane intelligence. The current demo shows the workflow and testnet proof concept; the next milestone is real Arc testnet settlement.
+
+## Data and Integrations
+
+- Google Routes is used for server-side routing when configured, with safe fallback miles when unavailable.
+- OpenWeather is used server-side through `OPENWEATHER_API_KEY`; the key is never exposed to the browser.
+- The app runs safely without `OPENWEATHER_API_KEY` by using fallback weather risk.
+- Gemini is used for AI dispatch recommendations when configured, with local fallback recommendation logic when unavailable.
+- Historical lane intelligence is preset/mock data for Texas, Illinois, and Georgia lanes.
+- Fuel prices are preset by state for the MVP and do not call a paid fuel API.
+- Load board APIs are intentionally deferred; manual load entry and import are planned later.
 
 ## Agent Payment Ledger
 
@@ -90,13 +123,19 @@ This matters because it makes AI-agent execution economically visible and prepar
 Current status:
 
 - Live public demo: COMPLETE
+- Stage 1 MVP scope: COMPLETE
 - Agent cards and recommendation flow: COMPLETE
 - Agent Payment Ledger: COMPLETE
+- Core product principles documented: COMPLETE
+- OpenWeather Risk Agent with fallback: COMPLETE
+- Historical lane intelligence: COMPLETE
+- Expanded trucking economics: COMPLETE
+- Why-ranked explanations: COMPLETE
 - Grant pitch page: COMPLETE
 - Embedded demo video: COMPLETE
-- Core product principles documented: COMPLETE
 - Real Arc testnet settlement: NEXT
 - Circle Developer Controlled Wallet integration: NEXT
+- Manual load entry/import: NEXT
 - Autonomous multi-shipment optimization: NEXT
 
 ## Roadmap / Grant Milestones
@@ -105,7 +144,7 @@ Current status:
 Status: COMPLETE
 
 Built and deployed a working public demo of an AI-powered logistics dispatcher.
-The current demo includes shipment selection, map view, agent cards, route/economics/risk analysis, BOOK/SKIP recommendation, and a paid agent run panel.
+The current demo includes shipment selection, map view, agent cards, route/economics/risk analysis, BOOK/WAIT/SKIP recommendation, and a paid agent run panel.
 
 ### Milestone 2 — Agent Payment Ledger
 Status: COMPLETE
@@ -113,11 +152,10 @@ Status: COMPLETE
 Added a USDC-denominated ledger for the agent run.
 The UI now shows per-agent execution costs for GPS, Route, Economics, and Risk agents, plus the total agent run cost of 0.005 USDC.
 
-### Milestone 3 — Grant-Ready Public Pitch
+### Milestone 3 — Stage 1 Logistics MVP
 Status: COMPLETE
 
-Added project positioning, architecture diagram, /grant page, Circle/Arc framing, and demo video.
-The project now has a clearer public explanation for ecosystem reviewers and grant submission.
+Closed the Stage 1 MVP scope with US trucking demo data, live/fallback weather risk, historical lane intelligence, expanded true-net economics, multi-load comparison, and why-ranked explanations.
 
 ### Milestone 4 — Real Arc Testnet Settlement
 Status: NEXT
@@ -134,8 +172,8 @@ The goal is to let the Payment Agent initiate and track agent payments securely 
 ### Milestone 6 — Autonomous Multi-Shipment Optimization
 Status: NEXT
 
-Extend the demo from analyzing one selected shipment to comparing multiple shipment requests automatically.
-Agents should rank opportunities by distance, ETA, profit, risk, and truck availability, then recommend the best load.
+Extend the demo from ranking preset matches to more autonomous dispatch workflows.
+Agents should compare load opportunities, account for weather, history, timing, profit, risk, and truck availability, then recommend the best load.
 
 ## Tech Stack
 
@@ -143,6 +181,8 @@ Agents should rank opportunities by distance, ETA, profit, risk, and truck avail
 - TypeScript
 - Tailwind CSS
 - Google Maps
+- Google Routes
+- OpenWeather
 - AI agent orchestration / Gemini
 - Circle Developer Platform
 - Arc Testnet
@@ -159,8 +199,9 @@ Required environment variables, without values:
 
 ```env
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
-GOOGLE_MAPS_API_KEY=
+GOOGLE_MAPS_SERVER_API_KEY=
 GEMINI_API_KEY=
+OPENWEATHER_API_KEY=
 CIRCLE_API_KEY=
 CIRCLE_ENTITY_SECRET=
 ```
