@@ -78,6 +78,12 @@ export type AgentRunResult = {
   };
 };
 
+function safeNumber(value: unknown, fallback = 0) {
+  const numberValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
 function createRunId(vehicleId: string, shipmentId: string) {
   const suffix = Math.random().toString(36).slice(2, 8);
   return `run-${vehicleId}-${shipmentId}-${suffix}`;
@@ -96,19 +102,30 @@ function formatLocation(location: Shipment["origin"]) {
 }
 
 function estimateTravelHours(totalMiles: number) {
-  return totalMiles / 58;
+  return safeNumber(totalMiles, 0) / 58;
 }
 
 function isPickupFeasible(vehicle: Vehicle, shipment: Shipment, deadheadMiles: number) {
-  const arrivalTime =
-    new Date(vehicle.availableAt).getTime() + estimateTravelHours(deadheadMiles) * 36e5;
+  const availableAt = new Date(vehicle.availableAt).getTime();
+  const pickupWindowEnd = new Date(shipment.pickupWindowEnd).getTime();
 
-  return arrivalTime <= new Date(shipment.pickupWindowEnd).getTime();
+  if (!Number.isFinite(availableAt) || !Number.isFinite(pickupWindowEnd)) {
+    return false;
+  }
+
+  const arrivalTime = availableAt + estimateTravelHours(deadheadMiles) * 36e5;
+
+  return arrivalTime <= pickupWindowEnd;
 }
 
 function isDeliveryFeasible(shipment: Shipment, totalMiles: number) {
   const pickupStart = new Date(shipment.pickupWindowStart).getTime();
   const deliveryEnd = new Date(shipment.deliveryWindowEnd).getTime();
+
+  if (!Number.isFinite(pickupStart) || !Number.isFinite(deliveryEnd)) {
+    return false;
+  }
+
   const travelTime = estimateTravelHours(totalMiles) * 36e5;
   const appointmentBuffer = 6 * 36e5;
 
@@ -130,51 +147,56 @@ function calculateRisk({
 }): RiskResult {
   const factors: string[] = [];
   let score = 12;
+  const deadheadMiles = safeNumber(economics.deadheadMiles, 0);
+  const totalMiles = safeNumber(economics.totalMiles, 0);
+  const trueNetProfit = safeNumber(economics.trueNetProfit, 0);
+  const trueMarginPercent = safeNumber(economics.trueMarginPercent, 0);
+  const rpmTotal = safeNumber(economics.rpmTotal, 0);
 
   if (vehicle.status !== "available") {
     score += 28;
     factors.push(`Vehicle availability risk: truck status is ${vehicle.status}.`);
   }
 
-  if (!isPickupFeasible(vehicle, shipment, economics.deadheadMiles)) {
+  if (!isPickupFeasible(vehicle, shipment, deadheadMiles)) {
     score += 20;
     factors.push("Pickup appointment risk: truck may miss the pickup window.");
   }
 
-  if (economics.deadheadMiles > 250) {
+  if (deadheadMiles > 250) {
     score += 20;
     factors.push("Long deadhead risk: more than 250 deadhead miles.");
-  } else if (economics.deadheadMiles > 150) {
+  } else if (deadheadMiles > 150) {
     score += 10;
     factors.push("Moderate deadhead risk: more than 150 deadhead miles.");
   }
 
-  if (shipment.weightLbs >= 42000) {
+  if (safeNumber(shipment.weightLbs, 0) >= 42000) {
     score += 12;
     factors.push("Heavy load risk: payload is near upper dry van planning range.");
   }
 
-  if (!isDeliveryFeasible(shipment, economics.totalMiles)) {
+  if (!isDeliveryFeasible(shipment, totalMiles)) {
     score += 18;
     factors.push("Delivery appointment risk: linehaul timing is tight.");
   }
 
-  if (economics.trueNetProfit < 150) {
+  if (trueNetProfit < 150) {
     score += 18;
     factors.push("Low profit risk: true net profit is below dispatch comfort range.");
   }
 
-  if (economics.trueMarginPercent < 10) {
+  if (trueMarginPercent < 10) {
     score += 12;
     factors.push("Weak true margin risk after detention, toll, and waiting estimates.");
   }
 
-  if (economics.rpmTotal < 1.35) {
+  if (rpmTotal < 1.35) {
     score += 14;
     factors.push("Low RPM risk: total-mile revenue is weak after deadhead.");
   }
 
-  if (historicalLane.delayRatePercent >= 25) {
+  if (safeNumber(historicalLane.delayRatePercent, 0) >= 25) {
     score += 8;
     factors.push("Historical delay risk: this lane has elevated delay history.");
   }
@@ -184,12 +206,12 @@ function calculateRisk({
     factors.push("Historical reload risk: weak reload market after delivery.");
   }
 
-  if (historicalLane.laneScore < 55) {
+  if (safeNumber(historicalLane.laneScore, 0) < 55) {
     score += 10;
     factors.push("Historical lane risk: lane score is below preferred threshold.");
   }
 
-  score += weatherRisk.riskScoreDelta;
+  score += safeNumber(weatherRisk.riskScoreDelta, 3);
   factors.push(`Weather risk: ${weatherRisk.summary}`);
   factors.push(...weatherRisk.reasons.slice(0, 2));
 
@@ -197,7 +219,7 @@ function calculateRisk({
     factors.push("No major demo risk factors detected.");
   }
 
-  const normalizedScore = Math.min(100, Math.round(score));
+  const normalizedScore = Math.min(100, Math.round(safeNumber(score, 100)));
 
   return {
     level:
@@ -213,11 +235,16 @@ function localRecommendation(
   economics: RouteEconomics,
   riskScore: number,
 ): Omit<MatchRecommendation, "source"> {
+  const trueNetProfit = safeNumber(economics.trueNetProfit, 0);
+  const trueMarginPercent = safeNumber(economics.trueMarginPercent, 0);
+  const rpmTotal = safeNumber(economics.rpmTotal, 0);
+  const safeRiskScore = safeNumber(riskScore, 100);
+
   if (
-    economics.trueNetProfit > 300 &&
-    economics.trueMarginPercent >= 14 &&
-    economics.rpmTotal >= 1.7 &&
-    riskScore < 60
+    trueNetProfit > 300 &&
+    trueMarginPercent >= 14 &&
+    rpmTotal >= 1.7 &&
+    safeRiskScore < 60
   ) {
     return {
       decision: "BOOK",
@@ -227,7 +254,7 @@ function localRecommendation(
     };
   }
 
-  if (economics.trueNetProfit > 75 && economics.rpmTotal >= 1.3 && riskScore < 76) {
+  if (trueNetProfit > 75 && rpmTotal >= 1.3 && safeRiskScore < 76) {
     return {
       decision: "WAIT",
       confidence: 64,
@@ -264,7 +291,9 @@ function parseAiDecision(
   return {
     decision,
     confidence:
-      typeof ai.confidence === "number" ? ai.confidence : fallback.confidence,
+      typeof ai.confidence === "number" && Number.isFinite(ai.confidence)
+        ? ai.confidence
+        : fallback.confidence,
     reason: ai.reason ?? fallback.reason,
     source: ai.source ?? "gemini",
   };
@@ -284,18 +313,22 @@ function createWhyRanked({
   feasible: boolean;
 }) {
   const reasons: string[] = [];
+  const deadheadMiles = safeNumber(economics.deadheadMiles, 0);
+  const rpmTotal = safeNumber(economics.rpmTotal, 0);
+  const trueNetProfit = safeNumber(economics.trueNetProfit, 0);
+  const trueMarginPercent = safeNumber(economics.trueMarginPercent, 0);
 
-  if (economics.deadheadMiles <= 100) reasons.push("Low deadhead miles.");
-  if (economics.rpmTotal >= 1.7) reasons.push("Strong total RPM.");
-  if (economics.trueNetProfit > 300) reasons.push("Positive true net profit after estimated costs.");
+  if (deadheadMiles <= 100) reasons.push("Low deadhead miles.");
+  if (rpmTotal >= 1.7) reasons.push("Strong total RPM.");
+  if (trueNetProfit > 300) reasons.push("Positive true net profit after estimated costs.");
   if (weatherRisk.riskLevel === "low") reasons.push("Acceptable weather risk.");
   if (historicalLane.reloadStrength === "high") reasons.push("Strong historical reload market.");
-  if (economics.deadheadMiles > 250) reasons.push("High deadhead miles.");
-  if (economics.trueMarginPercent < 10) reasons.push("Weak true margin after estimated costs.");
+  if (deadheadMiles > 250) reasons.push("High deadhead miles.");
+  if (trueMarginPercent < 10) reasons.push("Weak true margin after estimated costs.");
   if (weatherRisk.riskLevel === "high") reasons.push("Elevated weather risk.");
-  if (historicalLane.laneScore < 55) reasons.push("Poor historical lane score.");
+  if (safeNumber(historicalLane.laneScore, 0) < 55) reasons.push("Poor historical lane score.");
   if (!feasible) reasons.push("Tight pickup or delivery window.");
-  if (risk.score >= 65) reasons.push("High aggregate risk score.");
+  if (safeNumber(risk.score, 100) >= 65) reasons.push("High aggregate risk score.");
 
   return reasons.slice(0, 5);
 }
@@ -327,10 +360,10 @@ function createLocalMatch(vehicle: Vehicle, shipment: Shipment): RankedTruckLoad
   const rankScore = Number(
     (
       positiveProfitScore +
-      economics.rpmTotal * 120 +
-      historicalLane.laneScore * 0.8 -
-      risk.score * 2 -
-      economics.deadheadMiles * 0.25 +
+      safeNumber(economics.rpmTotal, 0) * 120 +
+      safeNumber(historicalLane.laneScore, 0) * 0.8 -
+      safeNumber(risk.score, 100) * 2 -
+      safeNumber(economics.deadheadMiles, 0) * 0.25 +
       feasibilityScore
     ).toFixed(2),
   );
@@ -358,7 +391,7 @@ function createLocalMatch(vehicle: Vehicle, shipment: Shipment): RankedTruckLoad
       feasible,
     }),
     feasible,
-    rankScore,
+    rankScore: Number.isFinite(rankScore) ? rankScore : -999,
   };
 }
 
@@ -390,11 +423,18 @@ export async function runPaidAgentAnalysis(
 
   const pickupRoute = await getRouteMetrics(vehicle.location, shipment.origin);
   const deliveryRoute = await getRouteMetrics(shipment.origin, shipment.destination);
+  const deadheadMiles = pickupRoute.source.startsWith("fallback")
+    ? 0
+    : safeNumber(pickupRoute.distanceMiles, 0);
+  const loadedMiles = safeNumber(
+    deliveryRoute.distanceMiles,
+    estimateFallbackDistanceMiles(shipment.origin, shipment.destination),
+  );
   const economics = calculateTruckingEconomics({
     truck: vehicle,
     shipment,
-    deadheadMiles: pickupRoute.distanceMiles,
-    loadedMiles: deliveryRoute.distanceMiles,
+    deadheadMiles,
+    loadedMiles,
   });
   const historicalLane = getHistoricalLaneData(shipment.origin, shipment.destination);
   const weatherRisk = await getWeatherRisk(shipment);
