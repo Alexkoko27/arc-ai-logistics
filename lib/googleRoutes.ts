@@ -7,8 +7,22 @@ type RoutePoint = {
 
 const METERS_PER_MILE = 1609.344;
 
-function formatDuration(duration: string) {
-  const seconds = Number(duration.replace("s", ""));
+function safeNumber(value: unknown, fallback = 0) {
+  const numberValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function isValidRoutePoint(point: RoutePoint) {
+  return Number.isFinite(point.lat) && Number.isFinite(point.lng);
+}
+
+function formatDuration(duration: unknown, fallbackMiles = 0) {
+  if (typeof duration !== "string" || !duration.endsWith("s")) {
+    return estimateFallbackEta(fallbackMiles);
+  }
+
+  const seconds = safeNumber(duration.replace("s", ""), 0);
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.round((seconds % 3600) / 60);
 
@@ -24,6 +38,10 @@ export function estimateFallbackDistanceMiles(
   origin: RoutePoint,
   destination: RoutePoint,
 ) {
+  if (!isValidRoutePoint(origin) || !isValidRoutePoint(destination)) {
+    return 0;
+  }
+
   const earthRadiusMiles = 3958.8;
   const deltaLat = toRadians(destination.lat - origin.lat);
   const deltaLng = toRadians(destination.lng - origin.lng);
@@ -39,13 +57,18 @@ export function estimateFallbackDistanceMiles(
 
   const directDistanceMiles =
     earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const estimatedMiles = directDistanceMiles * 1.22;
 
-  return Number((directDistanceMiles * 1.22).toFixed(1));
+  return Number.isFinite(estimatedMiles) ? Number(estimatedMiles.toFixed(1)) : 0;
 }
 
 function estimateFallbackEta(distanceMiles: number) {
+  const safeDistanceMiles = safeNumber(distanceMiles, 0);
   const averageSpeedMph = 58;
-  const totalMinutes = Math.round((distanceMiles / averageSpeedMph) * 60);
+  const totalMinutes = Math.max(
+    0,
+    Math.round((safeDistanceMiles / averageSpeedMph) * 60),
+  );
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
@@ -57,8 +80,12 @@ function fallbackRouteMetrics(
   origin: RoutePoint,
   destination: RoutePoint,
   source: string,
+  fallbackDistanceMiles?: number,
 ) {
-  const distanceMiles = estimateFallbackDistanceMiles(origin, destination);
+  const distanceMiles = safeNumber(
+    fallbackDistanceMiles,
+    estimateFallbackDistanceMiles(origin, destination),
+  );
 
   return {
     distanceMiles,
@@ -72,6 +99,15 @@ export async function getRouteMetrics(
   destination: RoutePoint = cargoLocation,
 ) {
   const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY;
+
+  if (!isValidRoutePoint(origin) || !isValidRoutePoint(destination)) {
+    return fallbackRouteMetrics(
+      origin,
+      destination,
+      "fallback-invalid-route-point",
+      0,
+    );
+  }
 
   if (!apiKey) {
     return fallbackRouteMetrics(origin, destination, "fallback-no-google-key");
@@ -124,18 +160,21 @@ export async function getRouteMetrics(
 
     const data = await response.json();
     const route = data.routes?.[0];
+    const distanceMeters = safeNumber(route?.distanceMeters, NaN);
 
-    if (!route) {
+    if (!route || !Number.isFinite(distanceMeters) || distanceMeters <= 0) {
       return fallbackRouteMetrics(
         origin,
         destination,
-        "fallback-google-routes-empty",
+        "fallback-google-routes-partial",
       );
     }
 
+    const distanceMiles = Number((distanceMeters / METERS_PER_MILE).toFixed(1));
+
     return {
-      distanceMiles: Number((route.distanceMeters / METERS_PER_MILE).toFixed(1)),
-      eta: formatDuration(route.duration),
+      distanceMiles,
+      eta: formatDuration(route.duration, distanceMiles),
       encodedPolyline: route.polyline?.encodedPolyline,
       source: "google-routes",
     };
