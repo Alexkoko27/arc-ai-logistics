@@ -32,21 +32,51 @@ export type RouteEconomics = {
   currency: Shipment["currency"];
 };
 
-function round(value: number, decimals = 2) {
-  return Number(value.toFixed(decimals));
+function safeNumber(value: unknown, fallback = 0) {
+  const numberValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function safePositiveNumber(value: unknown, fallback = 1) {
+  const numberValue = safeNumber(value, fallback);
+
+  return numberValue > 0 ? numberValue : fallback;
+}
+
+function safeDivide(numerator: unknown, denominator: unknown, fallback = 0) {
+  const safeDenominator = safeNumber(denominator, 0);
+
+  if (safeDenominator === 0) return fallback;
+
+  const result = safeNumber(numerator, 0) / safeDenominator;
+
+  return Number.isFinite(result) ? result : fallback;
+}
+
+function round(value: unknown, decimals = 2) {
+  const numberValue = safeNumber(value, 0);
+
+  return Number(numberValue.toFixed(decimals));
 }
 
 function hoursBetween(startIso: string, endIso: string) {
-  return Math.max(0, (new Date(endIso).getTime() - new Date(startIso).getTime()) / 36e5);
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+
+  return Math.max(0, (end - start) / 36e5);
 }
 
 function estimateTollCost(shipment: Shipment, totalMiles: number) {
+  const safeTotalMiles = safeNumber(totalMiles, 0);
   const touchesIllinois =
     shipment.origin.state === "Illinois" || shipment.destination.state === "Illinois";
-  const longHaul = totalMiles >= 800;
+  const longHaul = safeTotalMiles >= 800;
 
-  if (touchesIllinois) return round(totalMiles * 0.08 + 18);
-  if (longHaul) return round(totalMiles * 0.035 + 12);
+  if (touchesIllinois) return round(safeTotalMiles * 0.08 + 18);
+  if (longHaul) return round(safeTotalMiles * 0.035 + 12);
 
   return round(15);
 }
@@ -78,7 +108,7 @@ export function getFuelPricePerGallon(shipment: Shipment) {
   const originFuel = fuelPricePerGallonByState[shipment.origin.state];
   const destinationFuel = fuelPricePerGallonByState[shipment.destination.state];
 
-  return round((originFuel + destinationFuel) / 2);
+  return round((safeNumber(originFuel, 3.85) + safeNumber(destinationFuel, 3.85)) / 2);
 }
 
 export function calculateTruckingEconomics({
@@ -92,39 +122,45 @@ export function calculateTruckingEconomics({
   deadheadMiles: number;
   loadedMiles: number;
 }): RouteEconomics {
-  const totalMiles = deadheadMiles + loadedMiles;
+  const safeDeadheadMiles = Math.max(0, safeNumber(deadheadMiles, 0));
+  const safeLoadedMiles = Math.max(0, safeNumber(loadedMiles, 0));
+  const totalMiles = safeDeadheadMiles + safeLoadedMiles;
+  const safeRevenue = safePositiveNumber(shipment.revenue, 1);
   const fuelPricePerGallon = getFuelPricePerGallon(shipment);
-  const fuelGallons = totalMiles / truck.mpg;
+  const truckMpg = safePositiveNumber(truck.mpg, 6.5);
+  const driverRatePerMile = safeNumber(truck.driverRatePerMile, 0.7);
+  const fuelGallons = safeDivide(totalMiles, truckMpg, 0);
   const fuelCost = fuelGallons * fuelPricePerGallon;
-  const driverCost = totalMiles * truck.driverRatePerMile;
+  const driverCost = totalMiles * driverRatePerMile;
   const operatingCost = fuelCost + driverCost;
-  const grossProfit = shipment.revenue - operatingCost;
-  const rpmLoaded = shipment.revenue / Math.max(loadedMiles, 1);
-  const rpmTotal = shipment.revenue / Math.max(totalMiles, 1);
-  const marginPercent = (grossProfit / shipment.revenue) * 100;
+  const grossProfit = safeRevenue - operatingCost;
+  const rpmLoaded = safeDivide(safeRevenue, Math.max(safeLoadedMiles, 1), 0);
+  const rpmTotal = safeDivide(safeRevenue, Math.max(totalMiles, 1), 0);
+  const marginPercent = safeDivide(grossProfit, safeRevenue, 0) * 100;
   const historicalLane = getHistoricalLaneData(shipment.origin, shipment.destination);
   const detentionRatePerHour = 50;
   const estimatedDetentionHours = Math.max(
     0.5,
-    historicalLane.typicalDetentionHours + (shipment.weightLbs >= 42000 ? 0.5 : 0),
+    safeNumber(historicalLane.typicalDetentionHours, 1.5) +
+      (safeNumber(shipment.weightLbs, 0) >= 42000 ? 0.5 : 0),
   );
   const estimatedDetentionCost = estimatedDetentionHours * detentionRatePerHour;
   const estimatedTollCost = estimateTollCost(shipment, totalMiles);
   const waitingRiskLevel = estimateWaitingRisk(shipment);
   const waitingCostEstimate = estimateWaitingCost(waitingRiskLevel);
   const trueNetProfit =
-    shipment.revenue -
+    safeRevenue -
     fuelCost -
     driverCost -
     estimatedDetentionCost -
     estimatedTollCost -
     waitingCostEstimate;
-  const trueMarginPercent = (trueNetProfit / shipment.revenue) * 100;
+  const trueMarginPercent = safeDivide(trueNetProfit, safeRevenue, 0) * 100;
 
   return {
-    revenue: shipment.revenue,
-    deadheadMiles: round(deadheadMiles, 1),
-    loadedMiles: round(loadedMiles, 1),
+    revenue: round(safeRevenue),
+    deadheadMiles: round(safeDeadheadMiles, 1),
+    loadedMiles: round(safeLoadedMiles, 1),
     totalMiles: round(totalMiles, 1),
     fuelPricePerGallon,
     fuelGallons: round(fuelGallons, 1),
