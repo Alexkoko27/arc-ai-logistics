@@ -1,7 +1,12 @@
 import { analyzeRouteWithGemini } from "@/lib/gemini";
 import { estimateFallbackDistanceMiles, getRouteMetrics } from "@/lib/googleRoutes";
 import { calculateTruckingEconomics, RouteEconomics } from "@/lib/economics";
-import { getWeatherRiskPlaceholder } from "@/lib/weatherRisk";
+import { getHistoricalLaneData, HistoricalLaneData } from "@/lib/historicalLaneData";
+import {
+  getFallbackWeatherRisk,
+  getWeatherRisk,
+  WeatherRiskResult,
+} from "@/lib/weatherRisk";
 import {
   findShipment,
   findVehicle,
@@ -24,6 +29,8 @@ export type RiskResult = {
   level: "low" | "medium" | "high";
   score: number;
   factors: string[];
+  weather: WeatherRiskResult;
+  historicalLane: HistoricalLaneData;
 };
 
 export type MatchRecommendation = {
@@ -43,6 +50,9 @@ export type RankedTruckLoadMatch = {
   economics: RouteEconomics;
   risk: RiskResult;
   recommendation: MatchRecommendation;
+  historicalLane: HistoricalLaneData;
+  weatherRisk: WeatherRiskResult;
+  whyRanked: string[];
   feasible: boolean;
   rankScore: number;
 };
@@ -57,6 +67,9 @@ export type AgentRunResult = {
     routeSource: string;
   };
   risk: RiskResult;
+  weatherRisk: WeatherRiskResult;
+  historicalLane: HistoricalLaneData;
+  whyRanked: string[];
   recommendation: MatchRecommendation;
   payment: {
     feeAmount: string;
@@ -106,14 +119,17 @@ function calculateRisk({
   vehicle,
   shipment,
   economics,
+  weatherRisk,
+  historicalLane,
 }: {
   vehicle: Vehicle;
   shipment: Shipment;
   economics: RouteEconomics;
+  weatherRisk: WeatherRiskResult;
+  historicalLane: HistoricalLaneData;
 }): RiskResult {
   const factors: string[] = [];
-  let score = 14;
-  const weatherRisk = getWeatherRiskPlaceholder(shipment);
+  let score = 12;
 
   if (vehicle.status !== "available") {
     score += 28;
@@ -143,9 +159,14 @@ function calculateRisk({
     factors.push("Delivery appointment risk: linehaul timing is tight.");
   }
 
-  if (economics.grossProfit < 150) {
+  if (economics.trueNetProfit < 150) {
     score += 18;
-    factors.push("Low profit risk: gross profit is below dispatch comfort range.");
+    factors.push("Low profit risk: true net profit is below dispatch comfort range.");
+  }
+
+  if (economics.trueMarginPercent < 10) {
+    score += 12;
+    factors.push("Weak true margin risk after detention, toll, and waiting estimates.");
   }
 
   if (economics.rpmTotal < 1.35) {
@@ -153,8 +174,24 @@ function calculateRisk({
     factors.push("Low RPM risk: total-mile revenue is weak after deadhead.");
   }
 
-  score += weatherRisk.scoreImpact;
-  factors.push(...weatherRisk.factors);
+  if (historicalLane.delayRatePercent >= 25) {
+    score += 8;
+    factors.push("Historical delay risk: this lane has elevated delay history.");
+  }
+
+  if (historicalLane.reloadStrength === "low") {
+    score += 6;
+    factors.push("Historical reload risk: weak reload market after delivery.");
+  }
+
+  if (historicalLane.laneScore < 55) {
+    score += 10;
+    factors.push("Historical lane risk: lane score is below preferred threshold.");
+  }
+
+  score += weatherRisk.riskScoreDelta;
+  factors.push(`Weather risk: ${weatherRisk.summary}`);
+  factors.push(...weatherRisk.reasons.slice(0, 2));
 
   if (factors.length === 0) {
     factors.push("No major demo risk factors detected.");
@@ -167,6 +204,8 @@ function calculateRisk({
       normalizedScore >= 65 ? "high" : normalizedScore >= 38 ? "medium" : "low",
     score: normalizedScore,
     factors,
+    weather: weatherRisk,
+    historicalLane,
   };
 }
 
@@ -175,25 +214,25 @@ function localRecommendation(
   riskScore: number,
 ): Omit<MatchRecommendation, "source"> {
   if (
-    economics.grossProfit > 350 &&
-    economics.marginPercent >= 15 &&
-    economics.rpmTotal >= 1.75 &&
+    economics.trueNetProfit > 300 &&
+    economics.trueMarginPercent >= 14 &&
+    economics.rpmTotal >= 1.7 &&
     riskScore < 60
   ) {
     return {
       decision: "BOOK",
       confidence: 82,
       reason:
-        "Profit, total-mile RPM, and risk profile are strong enough for dispatch.",
+        "True net profit, total-mile RPM, and risk profile are strong enough for dispatch.",
     };
   }
 
-  if (economics.grossProfit > 100 && economics.rpmTotal >= 1.35 && riskScore < 75) {
+  if (economics.trueNetProfit > 75 && economics.rpmTotal >= 1.3 && riskScore < 76) {
     return {
       decision: "WAIT",
       confidence: 64,
       reason:
-        "The load is possible, but dispatcher should review timing, deadhead, or rate improvement.",
+        "The load is possible, but dispatcher should review timing, deadhead, weather, or rate improvement.",
     };
   }
 
@@ -201,7 +240,7 @@ function localRecommendation(
     decision: "SKIP",
     confidence: 71,
     reason:
-      "Expected profit, RPM, or risk profile is not strong enough for this truck-load match.",
+      "Expected true net profit, RPM, or risk profile is not strong enough for this truck-load match.",
   };
 }
 
@@ -231,6 +270,36 @@ function parseAiDecision(
   };
 }
 
+function createWhyRanked({
+  economics,
+  risk,
+  historicalLane,
+  weatherRisk,
+  feasible,
+}: {
+  economics: RouteEconomics;
+  risk: RiskResult;
+  historicalLane: HistoricalLaneData;
+  weatherRisk: WeatherRiskResult;
+  feasible: boolean;
+}) {
+  const reasons: string[] = [];
+
+  if (economics.deadheadMiles <= 100) reasons.push("Low deadhead miles.");
+  if (economics.rpmTotal >= 1.7) reasons.push("Strong total RPM.");
+  if (economics.trueNetProfit > 300) reasons.push("Positive true net profit after estimated costs.");
+  if (weatherRisk.riskLevel === "low") reasons.push("Acceptable weather risk.");
+  if (historicalLane.reloadStrength === "high") reasons.push("Strong historical reload market.");
+  if (economics.deadheadMiles > 250) reasons.push("High deadhead miles.");
+  if (economics.trueMarginPercent < 10) reasons.push("Weak true margin after estimated costs.");
+  if (weatherRisk.riskLevel === "high") reasons.push("Elevated weather risk.");
+  if (historicalLane.laneScore < 55) reasons.push("Poor historical lane score.");
+  if (!feasible) reasons.push("Tight pickup or delivery window.");
+  if (risk.score >= 65) reasons.push("High aggregate risk score.");
+
+  return reasons.slice(0, 5);
+}
+
 function createLocalMatch(vehicle: Vehicle, shipment: Shipment): RankedTruckLoadMatch {
   const deadheadMiles = estimateFallbackDistanceMiles(vehicle.location, shipment.origin);
   const loadedMiles = estimateFallbackDistanceMiles(shipment.origin, shipment.destination);
@@ -240,17 +309,26 @@ function createLocalMatch(vehicle: Vehicle, shipment: Shipment): RankedTruckLoad
     deadheadMiles,
     loadedMiles,
   });
-  const risk = calculateRisk({ vehicle, shipment, economics });
+  const historicalLane = getHistoricalLaneData(shipment.origin, shipment.destination);
+  const weatherRisk = getFallbackWeatherRisk(shipment);
+  const risk = calculateRisk({
+    vehicle,
+    shipment,
+    economics,
+    weatherRisk,
+    historicalLane,
+  });
   const fallback = localRecommendation(economics, risk.score);
   const feasible =
     isPickupFeasible(vehicle, shipment, economics.deadheadMiles) &&
     isDeliveryFeasible(shipment, economics.totalMiles);
-  const positiveProfitScore = economics.grossProfit > 0 ? 1000 : 0;
+  const positiveProfitScore = economics.trueNetProfit > 0 ? 1000 : 0;
   const feasibilityScore = feasible ? 120 : -120;
   const rankScore = Number(
     (
       positiveProfitScore +
-      economics.rpmTotal * 100 -
+      economics.rpmTotal * 120 +
+      historicalLane.laneScore * 0.8 -
       risk.score * 2 -
       economics.deadheadMiles * 0.25 +
       feasibilityScore
@@ -270,6 +348,15 @@ function createLocalMatch(vehicle: Vehicle, shipment: Shipment): RankedTruckLoad
       ...fallback,
       source: "local-ranking",
     },
+    historicalLane,
+    weatherRisk,
+    whyRanked: createWhyRanked({
+      economics,
+      risk,
+      historicalLane,
+      weatherRisk,
+      feasible,
+    }),
     feasible,
     rankScore,
   };
@@ -309,7 +396,15 @@ export async function runPaidAgentAnalysis(
     deadheadMiles: pickupRoute.distanceMiles,
     loadedMiles: deliveryRoute.distanceMiles,
   });
-  const risk = calculateRisk({ vehicle, shipment, economics });
+  const historicalLane = getHistoricalLaneData(shipment.origin, shipment.destination);
+  const weatherRisk = await getWeatherRisk(shipment);
+  const risk = calculateRisk({
+    vehicle,
+    shipment,
+    economics,
+    weatherRisk,
+    historicalLane,
+  });
   const fallbackRecommendation = localRecommendation(economics, risk.score);
   const aiResult = await analyzeRouteWithGemini({
     deadheadMiles: economics.deadheadMiles,
@@ -322,9 +417,27 @@ export async function runPaidAgentAnalysis(
     marginPercent: economics.marginPercent,
     rpmLoaded: economics.rpmLoaded,
     rpmTotal: economics.rpmTotal,
+    estimatedDetentionCost: economics.estimatedDetentionCost,
+    estimatedTollCost: economics.estimatedTollCost,
+    waitingCostEstimate: economics.waitingCostEstimate,
+    trueNetProfit: economics.trueNetProfit,
+    trueMarginPercent: economics.trueMarginPercent,
     riskScore: risk.score,
+    weatherRiskLevel: weatherRisk.riskLevel,
+    weatherSummary: weatherRisk.summary,
+    historicalLaneScore: historicalLane.laneScore,
+    historicalRiskNote: historicalLane.historicalRiskNote,
   });
   const recommendation = parseAiDecision(aiResult, fallbackRecommendation);
+  const whyRanked = createWhyRanked({
+    economics,
+    risk,
+    historicalLane,
+    weatherRisk,
+    feasible:
+      isPickupFeasible(vehicle, shipment, economics.deadheadMiles) &&
+      isDeliveryFeasible(shipment, economics.totalMiles),
+  });
 
   const agents: AgentResult[] = [
     {
@@ -353,27 +466,35 @@ export async function runPaidAgentAnalysis(
     },
     {
       name: "Economics Agent",
-      status: economics.grossProfit > 0 ? "complete" : "warning",
-      summary: `${economics.grossProfit} ${shipment.currency} estimated gross profit at ${economics.rpmTotal} RPM total.`,
+      status: economics.trueNetProfit > 0 ? "complete" : "warning",
+      summary: `${economics.trueNetProfit} ${shipment.currency} estimated true net profit at ${economics.rpmTotal} RPM total.`,
       details: {
         revenue: economics.revenue,
         fuelCost: economics.fuelCost,
         driverCost: economics.driverCost,
         operatingCost: economics.operatingCost,
+        estimatedDetentionCost: economics.estimatedDetentionCost,
+        estimatedTollCost: economics.estimatedTollCost,
+        waitingCostEstimate: economics.waitingCostEstimate,
+        trueNetProfit: economics.trueNetProfit,
+        trueMarginPercent: economics.trueMarginPercent,
         fuelGallons: economics.fuelGallons,
         fuelPricePerGallon: economics.fuelPricePerGallon,
         rpmLoaded: economics.rpmLoaded,
         rpmTotal: economics.rpmTotal,
-        marginPercent: economics.marginPercent,
       },
     },
     {
       name: "Risk Agent",
       status: risk.level === "high" ? "warning" : "complete",
-      summary: `${risk.level.toUpperCase()} risk score: ${risk.score}/100.`,
+      summary: `${risk.level.toUpperCase()} risk score: ${risk.score}/100 with ${weatherRisk.source === "openweather" ? "live" : "fallback"} weather risk.`,
       details: {
         riskScore: risk.score,
         riskLevel: risk.level,
+        weatherRiskLevel: weatherRisk.riskLevel,
+        weatherSource: weatherRisk.source,
+        historicalLaneScore: historicalLane.laneScore,
+        reloadStrength: historicalLane.reloadStrength,
         factors: risk.factors.join(" "),
       },
     },
@@ -390,6 +511,9 @@ export async function runPaidAgentAnalysis(
       routeSource: `${pickupRoute.source}/${deliveryRoute.source}`,
     },
     risk,
+    weatherRisk,
+    historicalLane,
+    whyRanked,
     recommendation,
     payment: {
       feeAmount: process.env.AGENT_ANALYSIS_FEE_USDC ?? "0.005",
