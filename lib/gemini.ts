@@ -11,20 +11,29 @@ type GeminiTruckingInput = {
   marginPercent: number;
   rpmLoaded: number;
   rpmTotal: number;
+  estimatedDetentionCost: number;
+  estimatedTollCost: number;
+  waitingCostEstimate: number;
+  trueNetProfit: number;
+  trueMarginPercent: number;
   riskScore: number;
+  weatherRiskLevel: "low" | "medium" | "high";
+  weatherSummary: string;
+  historicalLaneScore: number;
+  historicalRiskNote: string;
 };
 
 function fallbackDecision(input: GeminiTruckingInput) {
   if (
-    input.grossProfit > 350 &&
-    input.marginPercent >= 15 &&
-    input.rpmTotal >= 1.75 &&
+    input.trueNetProfit > 300 &&
+    input.trueMarginPercent >= 14 &&
+    input.rpmTotal >= 1.7 &&
     input.riskScore < 60
   ) {
     return "BOOK";
   }
 
-  if (input.grossProfit > 100 && input.rpmTotal >= 1.35 && input.riskScore < 75) {
+  if (input.trueNetProfit > 75 && input.rpmTotal >= 1.3 && input.riskScore < 76) {
     return "WAIT";
   }
 
@@ -58,11 +67,20 @@ Total miles: ${input.totalMiles}
 Revenue: ${input.revenue} USDC
 Fuel cost: ${input.fuelCost} USDC
 Driver cost: ${input.driverCost} USDC
-Gross profit: ${input.grossProfit} USDC
-Margin percent: ${input.marginPercent}%
+Gross profit before detention/tolls/waiting: ${input.grossProfit} USDC
+Margin percent before detention/tolls/waiting: ${input.marginPercent}%
+Estimated detention cost: ${input.estimatedDetentionCost} USDC
+Estimated toll cost: ${input.estimatedTollCost} USDC
+Estimated waiting cost: ${input.waitingCostEstimate} USDC
+True net profit: ${input.trueNetProfit} USDC
+True margin percent: ${input.trueMarginPercent}%
 RPM loaded: ${input.rpmLoaded} USDC/mile
 RPM total: ${input.rpmTotal} USDC/mile
 Risk score: ${input.riskScore}/100
+Weather risk level: ${input.weatherRiskLevel}
+Weather summary: ${input.weatherSummary}
+Historical lane score: ${input.historicalLaneScore}/100
+Historical lane note: ${input.historicalRiskNote}
 
 Return JSON only:
 {
