@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import MapView from "@/components/MapView";
+import { changelogEntries, latestChangelogEntry } from "@/lib/changelog";
 
 type LocationState = "Texas" | "Illinois" | "Georgia";
 
@@ -51,6 +52,26 @@ type AgentResult = {
   details: Record<string, string | number | boolean>;
 };
 
+type WeatherRiskResult = {
+  source: "openweather" | "fallback";
+  riskLevel: "low" | "medium" | "high";
+  weatherWeight: number;
+  riskScoreDelta: number;
+  summary: string;
+  reasons: string[];
+  checkedAt: string;
+};
+
+type HistoricalLaneData = {
+  averageRPM: number;
+  averageMarginPercent: number;
+  delayRatePercent: number;
+  reloadStrength: "high" | "medium" | "low";
+  typicalDetentionHours: number;
+  historicalRiskNote: string;
+  laneScore: number;
+};
+
 type Economics = {
   revenue: number;
   deadheadMiles: number;
@@ -65,7 +86,23 @@ type Economics = {
   rpmLoaded: number;
   rpmTotal: number;
   marginPercent: number;
+  estimatedDetentionHours: number;
+  detentionRatePerHour: number;
+  estimatedDetentionCost: number;
+  estimatedTollCost: number;
+  waitingRiskLevel: "low" | "medium" | "high";
+  waitingCostEstimate: number;
+  trueNetProfit: number;
+  trueMarginPercent: number;
   currency: "USDC";
+};
+
+type RiskResult = {
+  level: "low" | "medium" | "high";
+  score: number;
+  factors: string[];
+  weather: WeatherRiskResult;
+  historicalLane: HistoricalLaneData;
 };
 
 type AgentRun = {
@@ -77,11 +114,10 @@ type AgentRun = {
     eta: string;
     routeSource: string;
   };
-  risk: {
-    level: "low" | "medium" | "high";
-    score: number;
-    factors: string[];
-  };
+  risk: RiskResult;
+  weatherRisk: WeatherRiskResult;
+  historicalLane: HistoricalLaneData;
+  whyRanked: string[];
   recommendation: {
     decision: "BOOK" | "WAIT" | "SKIP";
     confidence: number;
@@ -103,17 +139,16 @@ type RankedTruckLoadMatch = {
   origin: string;
   destination: string;
   economics: Economics;
-  risk: {
-    level: "low" | "medium" | "high";
-    score: number;
-    factors: string[];
-  };
+  risk: RiskResult;
   recommendation: {
     decision: "BOOK" | "WAIT" | "SKIP";
     confidence: number;
     reason: string;
     source: string;
   };
+  historicalLane: HistoricalLaneData;
+  weatherRisk: WeatherRiskResult;
+  whyRanked: string[];
   feasible: boolean;
   rankScore: number;
 };
@@ -171,7 +206,15 @@ const agentPaymentLedger = [
 
 const totalAgentPayment = "0.005 USDC";
 const demoLabel = "TESTNET LIVE DEMO -";
-const demoVersion = "V 0.0.2 - 2026-05-26 06:41 UTC";
+const demoVersion = `${latestChangelogEntry.version} - ${latestChangelogEntry.date}`;
+const stageOneProgress = [
+  "Real routing",
+  "Live weather risk",
+  "Trucking economics",
+  "Multi-load comparison",
+  "Historical lane intelligence",
+  "Risk-aware recommendations",
+];
 
 function formatLocation(location: Coordinates) {
   return `${location.city}, ${location.state}`;
@@ -205,6 +248,10 @@ function formatDetails(details: AgentResult["details"]) {
     .join("\n");
 }
 
+function formatWeatherSource(source: WeatherRiskResult["source"]) {
+  return source === "openweather" ? "live" : "fallback";
+}
+
 export default function Home() {
   const [demoData, setDemoData] = useState<DemoDataResponse | null>(null);
   const [selectedShipmentId, setSelectedShipmentId] = useState("");
@@ -216,6 +263,7 @@ export default function Home() {
   >(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/demo-data")
@@ -334,10 +382,19 @@ export default function Home() {
             <p className="text-sm uppercase tracking-wide text-gray-500">
               US trucking paid AI logistics demo
             </p>
-            <p className="text-sm font-semibold uppercase tracking-wide sm:text-base">
-              <span>{demoLabel}</span>{" "}
-              <span className="text-red-600">{demoVersion}</span>
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-wide sm:text-base">
+              <p>
+                <span>{demoLabel}</span>{" "}
+                <span className="text-red-600">{demoVersion}</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsChangelogOpen(true)}
+                className="rounded border border-gray-300 px-2 py-1 text-xs uppercase tracking-wide text-gray-700 hover:bg-gray-50"
+              >
+                Changes
+              </button>
+            </div>
             <h1 className="text-2xl font-bold sm:text-3xl">Dispatcher Agent Control Center</h1>
           </div>
           <Link
@@ -355,11 +412,62 @@ export default function Home() {
         </p>
       </header>
 
+      {isChangelogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[85vh] w-full max-w-xl overflow-auto rounded-xl border bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-3">
+              <div>
+                <h2 className="font-bold">Changes</h2>
+                <p className="text-sm text-gray-600">Version history for the live demo.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChangelogOpen(false)}
+                className="rounded border border-gray-300 px-2 py-1 text-sm"
+                aria-label="Close changes"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-4 space-y-4">
+              {changelogEntries.map((entry) => (
+                <div className="rounded-lg border border-gray-200 p-3" key={entry.version}>
+                  <p className="font-semibold">{entry.version} - {entry.date}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                    {entry.changes.map((change) => (
+                      <li key={change}>{change}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
       )}
+
+      <section className="rounded-xl border p-4 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="font-bold">Stage 1 Progress</h2>
+            <p className="mt-1 text-sm font-semibold text-gray-700">
+              Stage 1 MVP scope: completed
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {stageOneProgress.map((item) => (
+              <div className="rounded-lg border border-gray-200 px-3 py-2" key={item}>
+                <span className="font-semibold">✓</span> {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="space-y-3 rounded-xl border p-4">
@@ -562,13 +670,41 @@ export default function Home() {
               <p>Fuel: {run.economics.fuelCost} {run.economics.currency}</p>
               <p>Driver: {run.economics.driverCost} {run.economics.currency}</p>
               <p>Gross profit: {run.economics.grossProfit} {run.economics.currency}</p>
+              <p>Estimated detention: {run.economics.estimatedDetentionCost} {run.economics.currency}</p>
+              <p>Estimated tolls: {run.economics.estimatedTollCost} {run.economics.currency}</p>
+              <p>Estimated waiting: {run.economics.waitingCostEstimate} {run.economics.currency}</p>
+              <p>True net profit: {run.economics.trueNetProfit} {run.economics.currency}</p>
+              <p>True margin: {run.economics.trueMarginPercent}%</p>
               <p>RPM loaded: {run.economics.rpmLoaded}</p>
               <p>RPM total: {run.economics.rpmTotal}</p>
+              <p>Weather: {run.weatherRisk.riskLevel} ({formatWeatherSource(run.weatherRisk.source)})</p>
+              <p>Historical lane score: {run.historicalLane.laneScore}/100</p>
               <p>Risk: {run.risk.level} ({run.risk.score}/100)</p>
             </div>
           </div>
 
-          <div className="space-y-2 break-words rounded-xl border p-4">
+          <div className="space-y-4 rounded-xl border p-4">
+            <div className="space-y-2">
+              <h2 className="font-bold">Why Ranked</h2>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">
+                {run.whyRanked.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="space-y-1 text-sm text-gray-600">
+              <h3 className="font-semibold text-gray-800">Weather Risk</h3>
+              <p>{run.weatherRisk.summary}</p>
+              <p>Source: {formatWeatherSource(run.weatherRisk.source)}</p>
+            </div>
+            <div className="space-y-1 text-sm text-gray-600">
+              <h3 className="font-semibold text-gray-800">Historical Lane Intelligence</h3>
+              <p>{run.historicalLane.historicalRiskNote}</p>
+              <p>Reload market: {run.historicalLane.reloadStrength}</p>
+            </div>
+          </div>
+
+          <div className="space-y-2 break-words rounded-xl border p-4 lg:col-span-2">
             <h2 className="font-bold">On-chain Proof</h2>
             {payment && (
               <div className="space-y-1 text-sm">
@@ -604,7 +740,7 @@ export default function Home() {
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-[1080px] w-full text-left text-xs">
+          <table className="min-w-[1320px] w-full text-left text-xs">
             <thead className="border-b border-gray-200 text-gray-500">
               <tr>
                 <th className="py-2 pr-3">Load</th>
@@ -616,10 +752,13 @@ export default function Home() {
                 <th className="py-2 pr-3">Revenue</th>
                 <th className="py-2 pr-3">Fuel</th>
                 <th className="py-2 pr-3">Driver</th>
-                <th className="py-2 pr-3">Profit</th>
+                <th className="py-2 pr-3">True net</th>
                 <th className="py-2 pr-3">RPM L/T</th>
+                <th className="py-2 pr-3">Weather</th>
+                <th className="py-2 pr-3">History</th>
                 <th className="py-2 pr-3">Risk</th>
                 <th className="py-2 pr-3">Rec</th>
+                <th className="py-2 pr-3">Why ranked</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -634,10 +773,13 @@ export default function Home() {
                   <td className="py-2 pr-3">{match.economics.revenue}</td>
                   <td className="py-2 pr-3">{match.economics.fuelCost}</td>
                   <td className="py-2 pr-3">{match.economics.driverCost}</td>
-                  <td className="py-2 pr-3">{match.economics.grossProfit}</td>
+                  <td className="py-2 pr-3 font-semibold">{match.economics.trueNetProfit}</td>
                   <td className="py-2 pr-3">{match.economics.rpmLoaded}/{match.economics.rpmTotal}</td>
+                  <td className="py-2 pr-3">{match.weatherRisk.riskLevel} ({formatWeatherSource(match.weatherRisk.source)})</td>
+                  <td className="py-2 pr-3">{match.historicalLane.laneScore}/100</td>
                   <td className="py-2 pr-3">{match.risk.score}</td>
                   <td className="py-2 pr-3 font-semibold">{match.recommendation.decision}</td>
+                  <td className="py-2 pr-3">{match.whyRanked.slice(0, 2).join(" ")}</td>
                 </tr>
               ))}
             </tbody>
