@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { runPaidAgentAnalysis } from "@/lib/agentRun";
-import { createAgentFeeTransfer } from "@/lib/circle";
+import { createCircleAgentPayment } from "@/lib/payments/circlePayment";
 
 type AgentRunRequest = {
   vehicleId?: string;
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   try {
     const run = await runPaidAgentAnalysis(body.shipmentId, body.vehicleId);
-    const payment = await createAgentFeeTransfer(run.id);
+    const payment = await createCircleAgentPayment(run.id);
 
     return NextResponse.json({
       success: true,
@@ -42,24 +42,22 @@ export async function POST(request: Request) {
         ...run,
         payment: {
           ...run.payment,
-          status: "submitted",
+          status: payment.status,
         },
       },
       payment,
+      paymentError: payment.status === "FAILED" ? payment.errorReason : undefined,
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Paid agent analysis failed.";
-    const status = message.includes("required for Arc Testnet payments")
-      ? 400
-      : 500;
 
     return NextResponse.json(
       {
         success: false,
         message,
       },
-      { status },
+      { status: 500 },
     );
   }
 }
