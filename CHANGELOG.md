@@ -1,0 +1,48 @@
+# Changelog
+
+## v0.0.4 — 2026-05-30 09:34 UTC
+
+Polish release focused on demo quality, payment proof visibility, release documentation, and reviewer presentation for Arc/Circle evaluation.
+
+- Added Autonomous Multi-Shipment Optimization.
+- Added shipment scoring engine.
+- Added ranked load recommendations.
+- Added compare-all-loads view.
+- Added Agent Economics Dashboard.
+- Added analytics API.
+- Added per-agent revenue tracking.
+- Added file-backed payment analytics persistence.
+- Improved Recent Payments table with transaction IDs, tx hashes, explorer proof links, and status badges.
+- Improved dashboard section titles, spacing, and concise descriptions.
+- Updated visible release version to v0.0.4.
+- Updated README to reflect current capabilities and release status.
+
+## v0.0.3a — 2026-05-28 09:23 UTC
+
+- Fixed NaN and null economics values.
+- Improved route fallback handling.
+- Added safe numeric guards.
+- Improved recommendation robustness.
+- Fixed partial route calculation edge cases.
+
+## v0.0.3 — 2026-05-28 08:39 UTC
+
+- Added OpenWeather Risk Agent.
+- Added weather-aware risk scoring.
+- Added historical lane intelligence.
+- Added detention, toll, and waiting cost estimates.
+- Added true net profit and true margin calculations.
+- Added why-ranked explanations.
+- Added Stage 1 progress block.
+- Updated README and environment example.
+
+## v0.0.2 — 2026-05-26 06:41 UTC
+
+- Migrated demo to US trucking lanes.
+- Added 10 preset dry van loads.
+- Added 3 demo trucks.
+- Switched economics from kilometers to miles.
+- Added state-based fuel cost.
+- Added driver cost per mile.
+- Added ranked multi-load comparison.
+- Added v0.0.2 timestamp to the live demo.
