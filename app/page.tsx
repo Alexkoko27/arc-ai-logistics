@@ -164,18 +164,18 @@ type DemoDataResponse = {
   };
 };
 
+type PaymentStatus = "INITIATED" | "PENDING" | "CLEARED" | "FAILED";
+
 type PaymentResponse = {
-  transactionId: string;
-  state: string;
-  txHash: string | null;
+  transactionId: string | null;
+  status: PaymentStatus;
   amount: string;
   currency: "USDC";
-  sourceWalletAddress: string;
-  destinationAddress: string;
-  network: string;
-  blockchain: string;
-  tokenAddress: string;
-  explorerBaseUrl: string;
+  timestamp: string;
+  txHash: string | null;
+  explorerUrl: string | null;
+  terminal: boolean;
+  errorReason?: string;
 };
 
 type AgentRunResponse = {
@@ -183,17 +183,12 @@ type AgentRunResponse = {
   message?: string;
   run?: AgentRun;
   payment?: PaymentResponse;
+  paymentError?: string;
 };
 
 type PaymentStatusResponse = {
   success: boolean;
-  status?: {
-    transactionId: string;
-    state: string;
-    txHash: string | null;
-    terminal: boolean;
-    explorerUrl: string;
-  };
+  status?: PaymentResponse;
   message?: string;
 };
 
@@ -242,6 +237,16 @@ function formatWindow(startIso: string, endIso: string) {
   return `${start} - ${end} UTC`;
 }
 
+function formatTimestamp(timestamp?: string) {
+  if (!timestamp) return "Unavailable";
+
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) return timestamp;
+
+  return date.toISOString();
+}
+
 function formatDetails(details: AgentResult["details"]) {
   return Object.entries(details)
     .map(([key, value]) => `${key}: ${String(value)}`)
@@ -252,15 +257,18 @@ function formatWeatherSource(source: WeatherRiskResult["source"]) {
   return source === "openweather" ? "live" : "fallback";
 }
 
+function isProcessingPayment(status: PaymentStatus | null) {
+  return status === "INITIATED" || status === "PENDING";
+}
+
 export default function Home() {
   const [demoData, setDemoData] = useState<DemoDataResponse | null>(null);
   const [selectedShipmentId, setSelectedShipmentId] = useState("");
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [run, setRun] = useState<AgentRun | null>(null);
   const [payment, setPayment] = useState<PaymentResponse | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<
-    PaymentStatusResponse["status"] | null
-  >(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentResponse | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
@@ -290,13 +298,19 @@ export default function Home() {
     [demoData, selectedVehicleId],
   );
 
-  const proofHash = paymentStatus?.txHash ?? payment?.txHash ?? null;
-  const proofLink = paymentStatus?.explorerUrl ?? payment?.explorerBaseUrl ?? null;
-  const ledgerStatus = proofHash
-    ? "Confirmed / Testnet proof"
-    : payment
-      ? "Paid / Testnet proof pending"
-      : "Demo tx proof pending";
+  const activePayment = paymentStatus ?? payment;
+  const activePaymentStatus = activePayment?.status ?? null;
+  const paymentInProgress = isProcessingPayment(activePaymentStatus);
+  const proofHash = activePayment?.txHash ?? null;
+  const proofLink = activePayment?.explorerUrl ?? null;
+  const ledgerStatus =
+    activePaymentStatus === "CLEARED"
+      ? "Paid / Confirmed"
+      : activePaymentStatus === "FAILED"
+        ? "Payment failed"
+        : paymentInProgress
+          ? "Payment processing"
+          : "Payment pending";
 
   useEffect(() => {
     if (!payment?.transactionId || paymentStatus?.terminal) return;
@@ -305,9 +319,14 @@ export default function Home() {
       fetch(`/api/pay/status?id=${payment.transactionId}`)
         .then((r) => r.json())
         .then((data: PaymentStatusResponse) => {
-          if (data.status) setPaymentStatus(data.status);
+          if (data.status) {
+            setPaymentStatus(data.status);
+            setPaymentError(data.status.errorReason ?? data.message ?? null);
+          } else if (data.message) {
+            setPaymentError(data.message);
+          }
         })
-        .catch(() => undefined);
+        .catch(() => setPaymentError("Unable to refresh Circle payment status."));
     }, 4000);
 
     return () => window.clearInterval(timer);
@@ -317,6 +336,7 @@ export default function Home() {
     setRun(null);
     setPayment(null);
     setPaymentStatus(null);
+    setPaymentError(null);
     setError(null);
   }
 
@@ -331,10 +351,11 @@ export default function Home() {
   }
 
   async function runAgents() {
-    if (!selectedShipmentId || !selectedVehicleId) return;
+    if (!selectedShipmentId || !selectedVehicleId || isRunning || paymentInProgress) return;
 
     setIsRunning(true);
     setError(null);
+    setPaymentError(null);
     setRun(null);
     setPayment(null);
     setPaymentStatus(null);
@@ -352,21 +373,19 @@ export default function Home() {
       });
       const data = (await response.json()) as AgentRunResponse;
 
-      if (!response.ok || !data.success || !data.run || !data.payment) {
+      if (!response.ok || !data.success || !data.run) {
         throw new Error(data.message ?? "Paid agent run failed.");
       }
 
       setRun(data.run);
-      setPayment(data.payment);
-      setPaymentStatus({
-        transactionId: data.payment.transactionId,
-        state: data.payment.state,
-        txHash: data.payment.txHash,
-        terminal: false,
-        explorerUrl: data.payment.txHash
-          ? `${data.payment.explorerBaseUrl}/tx/${data.payment.txHash}`
-          : data.payment.explorerBaseUrl,
-      });
+
+      if (data.payment) {
+        setPayment(data.payment);
+        setPaymentStatus(data.payment);
+        setPaymentError(data.payment.errorReason ?? data.paymentError ?? null);
+      } else {
+        setPaymentError(data.paymentError ?? "Circle payment was not created.");
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Agent run failed.");
     } finally {
@@ -566,12 +585,14 @@ export default function Home() {
             </div>
             <button
               onClick={runAgents}
-              disabled={isRunning || !selectedShipment || !selectedVehicle}
+              disabled={isRunning || paymentInProgress || !selectedShipment || !selectedVehicle}
               className="rounded bg-black px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-400"
             >
               {isRunning
-                ? "Running agents..."
-                : "Pay 0.005 USDC and analyze load"}
+                ? "Running analysis and payment..."
+                : paymentInProgress
+                  ? "Payment processing..."
+                  : "Pay 0.005 USDC and analyze load"}
             </button>
           </div>
 
@@ -616,21 +637,31 @@ export default function Home() {
               <span>Total</span>
               <span className="font-mono">{totalAgentPayment}</span>
             </div>
-            <div className="mt-3 space-y-1 break-words text-xs text-gray-600">
-              <p>Tx hash: {proofHash ?? "Demo tx proof pending"}</p>
-              {payment?.transactionId && <p>Transaction ID: {payment.transactionId}</p>}
-              {proofLink && (
-                <a
-                  className="font-semibold text-gray-800 underline underline-offset-4"
-                  href={proofLink}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open Arc Testnet explorer proof
-                </a>
-              )}
-            </div>
           </div>
+
+          {activePayment && (
+            <div className="rounded-lg border border-gray-200 p-3 text-sm">
+              <h3 className="font-bold">Payment Status</h3>
+              <div className="mt-2 space-y-1 text-gray-600">
+                <p>Amount: {activePayment.amount} {activePayment.currency}</p>
+                <p>Transaction ID: {activePayment.transactionId ?? "Unavailable"}</p>
+                <p>Status: <span className="font-semibold">{activePayment.status}</span></p>
+                <p>Timestamp: {formatTimestamp(activePayment.timestamp)}</p>
+                {proofHash && <p>Tx hash: {proofHash}</p>}
+                {paymentError && <p className="text-red-700">Reason: {paymentError}</p>}
+                {proofLink && (
+                  <a
+                    className="font-semibold text-gray-800 underline underline-offset-4"
+                    href={proofLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open Arc Testnet explorer proof
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -702,32 +733,6 @@ export default function Home() {
               <p>{run.historicalLane.historicalRiskNote}</p>
               <p>Reload market: {run.historicalLane.reloadStrength}</p>
             </div>
-          </div>
-
-          <div className="space-y-2 break-words rounded-xl border p-4 lg:col-span-2">
-            <h2 className="font-bold">On-chain Proof</h2>
-            {payment && (
-              <div className="space-y-1 text-sm">
-                <p>Network: {payment.network}</p>
-                <p>Fee: {payment.amount} {payment.currency}</p>
-                <p>Transaction ID: {payment.transactionId}</p>
-                <p>Status: {paymentStatus?.state ?? payment.state}</p>
-                <p>From: {payment.sourceWalletAddress}</p>
-                <p>To: {payment.destinationAddress}</p>
-                <p>Token: {payment.tokenAddress}</p>
-                {proofHash && <p>Tx hash: {proofHash}</p>}
-                {proofLink && (
-                  <a
-                    className="text-emerald-700 underline"
-                    href={proofLink}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open Arc Testnet proof
-                  </a>
-                )}
-              </div>
-            )}
           </div>
         </section>
       )}
