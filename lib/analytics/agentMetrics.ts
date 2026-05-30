@@ -1,3 +1,6 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import type { AgentPaymentResult, PaymentStatus } from "@/lib/payments/types";
 
 export type AgentRevenueMetric = {
@@ -32,7 +35,13 @@ const agentRevenueModel: AgentRevenueMetric[] = [
   { agent: "Economics Agent", amountPerRun: 0.0015, totalRevenue: 0 },
 ];
 
-const paymentRecords: RecentPaymentRecord[] = [];
+const analyticsStorePath = join(
+  tmpdir(),
+  "arc-ai-logistics",
+  "agent-payment-records.json",
+);
+
+let paymentRecords: RecentPaymentRecord[] = [];
 
 function safeAmount(amount: string) {
   const parsed = Number(amount);
@@ -44,6 +53,82 @@ function roundUsdc(value: number) {
   return Number(value.toFixed(6));
 }
 
+function isPaymentStatus(value: unknown): value is PaymentStatus {
+  return (
+    value === "INITIATED" ||
+    value === "PENDING" ||
+    value === "CLEARED" ||
+    value === "FAILED"
+  );
+}
+
+function isPaymentRecord(value: unknown): value is RecentPaymentRecord {
+  if (!value || typeof value !== "object") return false;
+
+  const record = value as Partial<RecentPaymentRecord>;
+
+  return (
+    typeof record.timestamp === "string" &&
+    typeof record.shipment === "string" &&
+    typeof record.amount === "number" &&
+    record.currency === "USDC" &&
+    isPaymentStatus(record.status) &&
+    (typeof record.transactionId === "string" || record.transactionId === null) &&
+    (typeof record.explorerUrl === "string" || record.explorerUrl === null)
+  );
+}
+
+function loadPaymentRecords() {
+  try {
+    if (!existsSync(analyticsStorePath)) return paymentRecords;
+
+    const raw = readFileSync(analyticsStorePath, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (!Array.isArray(parsed)) return paymentRecords;
+
+    paymentRecords = parsed.filter(isPaymentRecord).slice(0, 50);
+  } catch {
+    return paymentRecords;
+  }
+
+  return paymentRecords;
+}
+
+function savePaymentRecords(records: RecentPaymentRecord[]) {
+  paymentRecords = records.slice(0, 50);
+
+  try {
+    mkdirSync(dirname(analyticsStorePath), { recursive: true });
+    writeFileSync(
+      analyticsStorePath,
+      JSON.stringify(paymentRecords, null, 2),
+      "utf8",
+    );
+  } catch {
+    // Analytics must never break payment execution or status polling.
+  }
+}
+
+function upsertPaymentRecord(record: RecentPaymentRecord) {
+  const records = loadPaymentRecords();
+  const existingIndex = record.transactionId
+    ? records.findIndex((item) => item.transactionId === record.transactionId)
+    : -1;
+
+  if (existingIndex >= 0) {
+    records[existingIndex] = {
+      ...records[existingIndex],
+      ...record,
+      shipment: record.shipment || records[existingIndex].shipment,
+    };
+  } else {
+    records.unshift(record);
+  }
+
+  savePaymentRecords(records);
+}
+
 export function recordAgentPayment({
   payment,
   shipment,
@@ -51,7 +136,7 @@ export function recordAgentPayment({
   payment: AgentPaymentResult;
   shipment: string;
 }) {
-  const record: RecentPaymentRecord = {
+  upsertPaymentRecord({
     transactionId: payment.transactionId,
     timestamp: payment.timestamp,
     shipment,
@@ -59,46 +144,35 @@ export function recordAgentPayment({
     currency: payment.currency,
     status: payment.status,
     explorerUrl: payment.explorerUrl,
-  };
-  const existingIndex = payment.transactionId
-    ? paymentRecords.findIndex(
-        (item) => item.transactionId === payment.transactionId,
-      )
-    : -1;
-
-  if (existingIndex >= 0) {
-    paymentRecords[existingIndex] = record;
-  } else {
-    paymentRecords.unshift(record);
-  }
-
-  paymentRecords.splice(50);
+  });
 }
 
 export function updateAgentPaymentStatus(payment: AgentPaymentResult) {
   if (!payment.transactionId) return;
 
-  const existingIndex = paymentRecords.findIndex(
+  const records = loadPaymentRecords();
+  const existingRecord = records.find(
     (item) => item.transactionId === payment.transactionId,
   );
 
-  if (existingIndex < 0) return;
-
-  paymentRecords[existingIndex] = {
-    ...paymentRecords[existingIndex],
+  upsertPaymentRecord({
+    transactionId: payment.transactionId,
     timestamp: payment.timestamp,
+    shipment: existingRecord?.shipment ?? "Unknown shipment",
     amount: safeAmount(payment.amount),
+    currency: payment.currency,
     status: payment.status,
     explorerUrl: payment.explorerUrl,
-  };
+  });
 }
 
 export function getAgentMetrics(): AgentMetrics {
-  const totalAnalyses = paymentRecords.length;
-  const paymentsWithTransaction = paymentRecords.filter(
+  const records = loadPaymentRecords();
+  const totalAnalyses = records.length;
+  const paymentsWithTransaction = records.filter(
     (payment) => payment.transactionId,
   );
-  const clearedPayments = paymentRecords.filter(
+  const clearedPayments = records.filter(
     (payment) => payment.status === "CLEARED",
   );
   const totalUsdcSpent = roundUsdc(
@@ -106,7 +180,7 @@ export function getAgentMetrics(): AgentMetrics {
   );
   const averageCost = totalAnalyses > 0
     ? roundUsdc(
-        paymentRecords.reduce((sum, payment) => sum + payment.amount, 0) /
+        records.reduce((sum, payment) => sum + payment.amount, 0) /
           totalAnalyses,
       )
     : 0;
@@ -121,6 +195,6 @@ export function getAgentMetrics(): AgentMetrics {
       ...agent,
       totalRevenue: roundUsdc(agent.amountPerRun * clearedRuns),
     })),
-    recentPayments: paymentRecords.slice(0, 10),
+    recentPayments: records.slice(0, 10),
   };
 }
