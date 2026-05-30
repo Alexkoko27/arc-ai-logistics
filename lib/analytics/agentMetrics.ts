@@ -11,6 +11,7 @@ export type AgentRevenueMetric = {
 
 export type RecentPaymentRecord = {
   transactionId: string | null;
+  txHash: string | null;
   timestamp: string;
   shipment: string;
   amount: number;
@@ -74,8 +75,16 @@ function isPaymentRecord(value: unknown): value is RecentPaymentRecord {
     record.currency === "USDC" &&
     isPaymentStatus(record.status) &&
     (typeof record.transactionId === "string" || record.transactionId === null) &&
+    (typeof record.txHash === "string" || record.txHash === null || record.txHash === undefined) &&
     (typeof record.explorerUrl === "string" || record.explorerUrl === null)
   );
+}
+
+function normalizePaymentRecord(record: RecentPaymentRecord): RecentPaymentRecord {
+  return {
+    ...record,
+    txHash: record.txHash ?? null,
+  };
 }
 
 function loadPaymentRecords() {
@@ -87,7 +96,10 @@ function loadPaymentRecords() {
 
     if (!Array.isArray(parsed)) return paymentRecords;
 
-    paymentRecords = parsed.filter(isPaymentRecord).slice(0, 50);
+    paymentRecords = parsed
+      .filter(isPaymentRecord)
+      .map(normalizePaymentRecord)
+      .slice(0, 50);
   } catch {
     return paymentRecords;
   }
@@ -138,6 +150,7 @@ export function recordAgentPayment({
 }) {
   upsertPaymentRecord({
     transactionId: payment.transactionId,
+    txHash: payment.txHash,
     timestamp: payment.timestamp,
     shipment,
     amount: safeAmount(payment.amount),
@@ -157,6 +170,7 @@ export function updateAgentPaymentStatus(payment: AgentPaymentResult) {
 
   upsertPaymentRecord({
     transactionId: payment.transactionId,
+    txHash: payment.txHash,
     timestamp: payment.timestamp,
     shipment: existingRecord?.shipment ?? "Unknown shipment",
     amount: safeAmount(payment.amount),
