@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAgentFeeTransferStatus } from "@/lib/circle";
+import { getCircleAgentPaymentStatus } from "@/lib/payments/circlePayment";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,23 +15,11 @@ export async function GET(request: Request) {
     );
   }
 
-  try {
-    const status = await getAgentFeeTransferStatus(transactionId);
+  const status = await getCircleAgentPaymentStatus(transactionId);
 
-    return NextResponse.json({
-      success: true,
-      status,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to fetch transaction status.",
-      },
-      { status: 500 },
-    );
-  }
+  return NextResponse.json({
+    success: status.status !== "FAILED",
+    status,
+    message: status.errorReason,
+  });
 }
