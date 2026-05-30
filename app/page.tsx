@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import MapView from "@/components/MapView";
+import ShipmentOptimizationPanel from "@/components/ShipmentOptimizationPanel";
 import { changelogEntries, latestChangelogEntry } from "@/lib/changelog";
 
 type LocationState = "Texas" | "Illinois" | "Georgia";
@@ -153,10 +154,26 @@ type RankedTruckLoadMatch = {
   rankScore: number;
 };
 
+type ShipmentScoreBreakdown = {
+  distance: number;
+  profit: number;
+  eta: number;
+  risk: number;
+};
+
+type RankedShipment = {
+  rank: number;
+  shipment: Shipment;
+  match: RankedTruckLoadMatch;
+  score: number;
+  scoreBreakdown: ShipmentScoreBreakdown;
+};
+
 type DemoDataResponse = {
   vehicles: Vehicle[];
   shipments: Shipment[];
   comparisons: RankedTruckLoadMatch[];
+  rankedShipments: RankedShipment[];
   agentFee: {
     amount: string;
     currency: "USDC";
@@ -416,12 +433,20 @@ export default function Home() {
             </div>
             <h1 className="text-2xl font-bold sm:text-3xl">Dispatcher Agent Control Center</h1>
           </div>
-          <Link
-            className="text-sm font-semibold underline underline-offset-4"
-            href="/grant"
-          >
-            Circle grant pitch
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              className="text-sm font-semibold underline underline-offset-4"
+              href="/dashboard"
+            >
+              Agent dashboard
+            </Link>
+            <Link
+              className="text-sm font-semibold underline underline-offset-4"
+              href="/grant"
+            >
+              Circle grant pitch
+            </Link>
+          </div>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
           Select one US dry van truck and one load. The Fleet GPS, Route,
@@ -736,6 +761,8 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      <ShipmentOptimizationPanel rankedShipments={demoData?.rankedShipments ?? []} />
 
       <section className="space-y-3 rounded-xl border p-4">
         <div>
