@@ -19,18 +19,28 @@ const milestones = [
   },
   {
     title: "Milestone 4 — Real Arc Testnet Settlement",
-    status: "NEXT",
-    body: "Replace the current demo/testnet-style transaction proof with real Arc testnet settlement. Each paid agent run should produce a real transaction hash and explorer-confirmed proof.",
+    status: "COMPLETE",
+    body: "Real Arc testnet settlement is implemented. Each paid agent run produces a real transaction ID, transaction hash, status lifecycle, and Arc Explorer-confirmed proof.",
   },
   {
     title: "Milestone 5 — Circle Developer Controlled Wallet Integration",
-    status: "NEXT",
-    body: "Integrate Circle Developer Controlled Wallets for programmatic USDC payments. The goal is to let the Payment Agent initiate and track agent payments securely without exposing private keys.",
+    status: "COMPLETE",
+    body: "Circle Developer Controlled Wallets are integrated. Agent payments are initiated and tracked through Circle without exposing private keys.",
   },
   {
     title: "Milestone 6 — Autonomous Multi-Shipment Optimization",
+    status: "COMPLETE",
+    body: "The system now compares multiple truck/load opportunities, calculates scores, ranks options, and recommends the best shipment automatically.",
+  },
+  {
+    title: "Milestone 7 — Agent Economics Dashboard",
+    status: "COMPLETE",
+    body: "Added a dedicated analytics dashboard showing Total Payments, Total USDC Spent, Average Cost per Analysis, Total Analyses, Per-Agent Revenue, Recent Payments, Transaction IDs, Transaction Hashes, and Arc Explorer Proof Links. Analytics records are persisted using the current file-backed analytics store.",
+  },
+  {
+    title: "Milestone 8 — Real Freight Data Integration",
     status: "NEXT",
-    body: "Extend the demo from analyzing one selected shipment to comparing multiple shipment requests automatically. Agents should rank opportunities by distance, ETA, profit, risk, and truck availability, then recommend the best load.",
+    body: "Replace demo logistics inputs with production-grade external data sources: real freight marketplace integrations, real weather feeds, real route intelligence, real GPS/fleet telemetry, improved dispatch recommendations, and higher confidence agent decisions. Expected outcome: the platform evaluates live freight opportunities instead of demo datasets while preserving the existing Circle payment and Arc settlement architecture.",
   },
 ];
 
@@ -42,7 +52,21 @@ const demoItems = [
   "Recommendation",
   "Paid Agent Run",
   "Agent Payment Ledger",
-  "Tx proof",
+  "Arc Explorer proof",
+  "Multi-shipment optimization",
+  "Agent Economics Dashboard",
+  "Transaction IDs",
+  "Transaction hashes",
+];
+
+const implementedItems = [
+  "AI Logistics Analysis",
+  "Multi-Agent Architecture",
+  "Circle DCW Payments",
+  "Arc Settlement Proof",
+  "Multi-Shipment Optimization",
+  "Agent Economics Dashboard",
+  "Analytics Persistence",
 ];
 
 function statusClass(status: string) {
@@ -150,14 +174,13 @@ export default function GrantPage() {
           <div className="mt-3 grid grid-cols-1 gap-4 text-gray-700 lg:grid-cols-2">
             <p>
               Arc is stablecoin-native and fits agentic payment workflows. USDC
-              is the settlement unit, and Circle Developer Controlled Wallets can
-              power programmatic agent payments.
+              is the settlement unit, and Circle Developer Controlled Wallets
+              now power programmatic agent payments in the current demo.
             </p>
             <p>
-              Nanopayment-style flows can pay agents per task or per run. This
-              project explores real machine-to-machine commerce for logistics,
-              where software agents can evaluate work and settle execution in
-              stablecoins.
+              The app demonstrates real Circle-initiated USDC settlement on Arc
+              testnet with transaction status, tx hash, and explorer proof. This
+              creates a practical base for machine-to-machine commerce in logistics.
             </p>
           </div>
         </section>
@@ -178,6 +201,28 @@ export default function GrantPage() {
                 {item}
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-gray-200 bg-gray-50 p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Current Release
+              </p>
+              <h2 className="text-2xl font-bold">v0.0.4</h2>
+              <p className="max-w-2xl text-sm leading-6 text-gray-700">
+                The current release includes real payment proof, multi-shipment
+                optimization, and analytics visibility for paid agent runs.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:min-w-[28rem]">
+              {implementedItems.map((item) => (
+                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2" key={item}>
+                  {item}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
