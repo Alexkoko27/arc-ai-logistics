@@ -35,8 +35,8 @@ export default function DashboardPage() {
             Arc AI Logistics Payment Analytics
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
-            Runtime view of paid agent analyses, USDC spend, per-agent revenue,
-            and recent Circle/Arc payment proofs.
+            File-backed view of paid agent analyses, USDC spend, per-agent revenue,
+            and recent Circle/Arc payment proofs for the current deployment runtime.
           </p>
         </div>
         <Link className="text-sm font-semibold underline underline-offset-4" href="/">
@@ -82,8 +82,9 @@ export default function DashboardPage() {
           <div>
             <h2 className="font-bold">Analytics Scope</h2>
             <p className="text-sm leading-6 text-gray-600">
-              This dashboard uses the current server runtime payment records. It
-              does not introduce a database, queue, or secret-bearing client code.
+              This dashboard uses a small server-side JSON store in the runtime
+              temp directory. It keeps local development reliable without adding
+              a database, queue, or secret-bearing client code.
             </p>
           </div>
           <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
@@ -138,7 +139,7 @@ export default function DashboardPage() {
               ) : (
                 <tr>
                   <td className="py-4 text-gray-500" colSpan={5}>
-                    No payment records in this server runtime yet.
+                    No payment records in this deployment runtime yet.
                   </td>
                 </tr>
               )}
