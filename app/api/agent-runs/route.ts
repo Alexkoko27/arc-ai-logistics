@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runPaidAgentAnalysis } from "@/lib/agentRun";
+import { recordAgentPayment } from "@/lib/analytics/agentMetrics";
 import { createCircleAgentPayment } from "@/lib/payments/circlePayment";
 
 type AgentRunRequest = {
@@ -35,6 +36,11 @@ export async function POST(request: Request) {
   try {
     const run = await runPaidAgentAnalysis(body.shipmentId, body.vehicleId);
     const payment = await createCircleAgentPayment(run.id);
+
+    recordAgentPayment({
+      payment,
+      shipment: run.shipment.reference,
+    });
 
     return NextResponse.json({
       success: true,
