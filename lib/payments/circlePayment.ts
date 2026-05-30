@@ -12,12 +12,6 @@ type CircleTransactionData = {
   transactionHash?: string;
   createDate?: string;
   updateDate?: string;
-  amounts?: string[];
-  amount?: string[] | string;
-};
-
-type CircleTransactionResponse = {
-  data?: CircleTransactionData | { transaction?: CircleTransactionData };
 };
 
 function getAgentFeeAmount() {
@@ -47,15 +41,6 @@ function getCircleClient() {
     apiKey: requirePaymentEnv("CIRCLE_API_KEY"),
     entitySecret: requirePaymentEnv("CIRCLE_ENTITY_SECRET"),
   });
-}
-
-function getTransaction(payload: CircleTransactionResponse): CircleTransactionData | undefined {
-  const data = payload.data;
-
-  if (!data) return undefined;
-  if ("transaction" in data) return data.transaction;
-
-  return data;
 }
 
 function getTransactionHash(transaction?: CircleTransactionData) {
@@ -104,11 +89,8 @@ function failedPaymentResult(error: unknown): AgentPaymentResult {
   };
 }
 
-function paymentResultFromTransaction(
-  transaction: CircleTransactionData,
-  fallbackStatus: PaymentStatus,
-): AgentPaymentResult {
-  const status = normalizeCircleStatus(transaction.state ?? transaction.status) ?? fallbackStatus;
+function paymentResultFromTransaction(transaction: CircleTransactionData): AgentPaymentResult {
+  const status = normalizeCircleStatus(transaction.state ?? transaction.status);
   const txHash = getTransactionHash(transaction);
 
   return {
@@ -131,7 +113,7 @@ export async function createCircleAgentPayment(runId: string): Promise<AgentPaym
     const tokenAddress = requirePaymentEnv("ARC_USDC_TOKEN_ADDRESS");
     const amount = getAgentFeeAmount();
 
-    const transferResponse = (await client.createTransaction({
+    const transferResponse = await client.createTransaction({
       blockchain: ARC_TESTNET_BLOCKCHAIN,
       walletAddress: sourceWalletAddress,
       tokenAddress,
@@ -144,15 +126,14 @@ export async function createCircleAgentPayment(runId: string): Promise<AgentPaym
         },
       },
       refId: runId,
-    })) as CircleTransactionResponse;
-
-    const transaction = getTransaction(transferResponse);
+    });
+    const transaction = transferResponse.data as CircleTransactionData | undefined;
 
     if (!transaction?.id) {
       throw new Error("Circle transfer creation failed: no transaction ID returned.");
     }
 
-    return paymentResultFromTransaction(transaction, "INITIATED");
+    return paymentResultFromTransaction(transaction);
   } catch (error) {
     return failedPaymentResult(error);
   }
@@ -163,22 +144,19 @@ export async function getCircleAgentPaymentStatus(
 ): Promise<AgentPaymentResult> {
   try {
     const client = getCircleClient();
-    const response = (await client.getTransaction({
+    const response = await client.getTransaction({
       id: transactionId,
-    })) as CircleTransactionResponse;
-    const transaction = getTransaction(response);
+    });
+    const transaction = response.data?.transaction as CircleTransactionData | undefined;
 
     if (!transaction) {
       throw new Error("Circle transaction status response was empty.");
     }
 
-    return paymentResultFromTransaction(
-      {
-        ...transaction,
-        id: transaction.id ?? transactionId,
-      },
-      "PENDING",
-    );
+    return paymentResultFromTransaction({
+      ...transaction,
+      id: transaction.id ?? transactionId,
+    });
   } catch (error) {
     return {
       ...failedPaymentResult(error),
