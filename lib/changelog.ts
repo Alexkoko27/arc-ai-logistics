@@ -6,6 +6,20 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: "v0.0.4",
+    date: "2026-05-30 09:34 UTC",
+    changes: [
+      "Added Autonomous Multi-Shipment Optimization",
+      "Added shipment scoring engine and ranked load recommendations",
+      "Added compare-all-loads view",
+      "Added Agent Economics Dashboard",
+      "Added analytics API and per-agent revenue tracking",
+      "Added file-backed payment analytics persistence",
+      "Improved payment proof visibility with transaction IDs, tx hashes, and explorer links",
+      "Improved dashboard spacing, descriptions, and payment status badges",
+    ],
+  },
+  {
     version: "v0.0.3a",
     date: "2026-05-28 09:23 UTC",
     changes: [
