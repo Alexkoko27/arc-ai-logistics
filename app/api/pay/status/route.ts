@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { updateAgentPaymentStatus } from "@/lib/analytics/agentMetrics";
 import { getCircleAgentPaymentStatus } from "@/lib/payments/circlePayment";
 
 export async function GET(request: Request) {
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
   }
 
   const status = await getCircleAgentPaymentStatus(transactionId);
+
+  updateAgentPaymentStatus(status);
 
   return NextResponse.json({
     success: status.status !== "FAILED",
