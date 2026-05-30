@@ -219,14 +219,6 @@ const agentPaymentLedger = [
 const totalAgentPayment = "0.005 USDC";
 const demoLabel = "TESTNET LIVE DEMO -";
 const demoVersion = `${latestChangelogEntry.version} - ${latestChangelogEntry.date}`;
-const stageOneProgress = [
-  "Real routing",
-  "Live weather risk",
-  "Trucking economics",
-  "Multi-load comparison",
-  "Historical lane intelligence",
-  "Risk-aware recommendations",
-];
 
 function formatLocation(location: Coordinates) {
   return `${location.city}, ${location.state}`;
@@ -495,24 +487,6 @@ export default function Home() {
         </div>
       )}
 
-      <section className="rounded-xl border p-4 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="font-bold">Stage 1 Progress</h2>
-            <p className="mt-1 text-sm font-semibold text-gray-700">
-              Stage 1 MVP scope: completed
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            {stageOneProgress.map((item) => (
-              <div className="rounded-lg border border-gray-200 px-3 py-2" key={item}>
-                <span className="font-semibold">✓</span> {item}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="space-y-3 rounded-xl border p-4">
           <h2 className="font-bold">Demo Trucks</h2>
@@ -546,7 +520,7 @@ export default function Home() {
         <div className="space-y-3 rounded-xl border p-4 xl:col-span-2">
           <h2 className="font-bold">Load Board</h2>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {demoData?.shipments.map((shipment) => (
+            {demoData?.shipments.slice(0, 6).map((shipment) => (
               <label
                 className="block cursor-pointer rounded-lg border p-3 has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
                 key={shipment.id}
