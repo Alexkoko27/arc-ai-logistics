@@ -4,5 +4,5 @@ import { getAgentMetrics } from "@/lib/analytics/agentMetrics";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json(getAgentMetrics());
+  return NextResponse.json(await getAgentMetrics());
 }
