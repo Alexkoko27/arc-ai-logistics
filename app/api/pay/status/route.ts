@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
   const status = await getCircleAgentPaymentStatus(transactionId);
 
-  updateAgentPaymentStatus(status);
+  await updateAgentPaymentStatus(status);
 
   return NextResponse.json({
     success: status.status !== "FAILED",

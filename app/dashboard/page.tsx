@@ -41,8 +41,8 @@ function statusBadgeClass(status: PaymentStatus) {
   return `${base} border-gray-200 bg-gray-50 text-gray-700`;
 }
 
-export default function DashboardPage() {
-  const metrics = getAgentMetrics();
+export default async function DashboardPage() {
+  const metrics = await getAgentMetrics();
   const summaryCards = [
     {
       label: "Total Payments",
@@ -203,7 +203,7 @@ export default function DashboardPage() {
               ) : (
                 <tr>
                   <td className="py-4 text-gray-500" colSpan={7}>
-                    No payment records in this deployment runtime yet.
+                    No payment records yet.
                   </td>
                 </tr>
               )}

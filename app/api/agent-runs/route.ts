@@ -1,33 +1,25 @@
 import { NextResponse } from "next/server";
 import { runPaidAgentAnalysis } from "@/lib/agentRun";
 import { recordAgentPayment } from "@/lib/analytics/agentMetrics";
+import { createStoredAnalysisRun } from "@/lib/db/analysisPersistence";
 import { createCircleAgentPayment } from "@/lib/payments/circlePayment";
+import { z } from "zod";
 
-type AgentRunRequest = {
-  vehicleId?: string;
-  shipmentId?: string;
-};
+const agentRunRequestSchema = z.object({
+  vehicleId: z.string().optional(),
+  shipmentId: z.string().min(1),
+});
 
 export async function POST(request: Request) {
-  let body: AgentRunRequest;
+  let body: z.infer<typeof agentRunRequestSchema>;
 
   try {
-    body = (await request.json()) as AgentRunRequest;
+    body = agentRunRequestSchema.parse(await request.json());
   } catch {
     return NextResponse.json(
       {
         success: false,
-        message: "Request body must be valid JSON.",
-      },
-      { status: 400 },
-    );
-  }
-
-  if (!body.shipmentId) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: "shipmentId is required.",
+        message: "Request body must include a valid shipmentId.",
       },
       { status: 400 },
     );
@@ -35,9 +27,18 @@ export async function POST(request: Request) {
 
   try {
     const run = await runPaidAgentAnalysis(body.shipmentId, body.vehicleId);
+    let analysisRunId: string | null = null;
+
+    try {
+      analysisRunId = await createStoredAnalysisRun(run);
+    } catch {
+      analysisRunId = null;
+    }
+
     const payment = await createCircleAgentPayment(run.id);
 
-    recordAgentPayment({
+    await recordAgentPayment({
+      analysisRunId,
       payment,
       shipment: run.shipment.reference,
     });
