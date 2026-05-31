@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.0.4.a - 2026-05-31 09:04 UTC
+
+Database persistence wording and release note update for the Neon/Drizzle integration.
+
+- Neon/Postgres analytics persistence is now active.
+- Drizzle schema and migrations added.
+- analysis_runs, agent_runs, payment_records persistence added.
+- Legacy JSON fallback retained.
+- Dashboard copy updated.
+
 ## v0.0.4 — 2026-05-30 09:34 UTC
 
 Polish release focused on demo quality, payment proof visibility, release documentation, and reviewer presentation for Arc/Circle evaluation.

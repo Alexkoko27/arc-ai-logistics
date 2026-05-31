@@ -77,8 +77,8 @@ export default async function DashboardPage() {
             Arc AI Logistics Payment Analytics
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
-            File-backed view of paid agent analyses, USDC spend, per-agent revenue,
-            and recent Circle/Arc payment proofs for the current deployment runtime.
+            Neon/Postgres-backed view of paid agent analyses, USDC spend,
+            per-agent revenue, and recent Circle/Arc payment proofs.
           </p>
         </div>
         <Link className="text-sm font-semibold underline underline-offset-4" href="/">
@@ -138,9 +138,10 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
-            Analytics uses a small server-side JSON store in the runtime temp
-            directory. Existing Circle payment execution and status polling remain
-            owned by the server-side payment service.
+            Analytics is now persisted in Neon/Postgres through the server-side
+            database layer. The legacy JSON analytics store remains isolated as a
+            compatibility fallback while Circle payment execution and status
+            polling stay owned by the server-side payment service.
           </div>
         </div>
       </section>
