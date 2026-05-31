@@ -6,6 +6,17 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: "v0.0.4.a",
+    date: "2026-05-31 09:04 UTC",
+    changes: [
+      "Activated Neon/Postgres analytics persistence",
+      "Added Drizzle schema and migration setup",
+      "Added analysis_runs, agent_runs, and payment_records persistence",
+      "Retained legacy JSON analytics fallback",
+      "Updated dashboard copy for database-backed analytics",
+    ],
+  },
+  {
     version: "v0.0.4",
     date: "2026-05-30 09:34 UTC",
     changes: [

@@ -30,7 +30,8 @@ The demo combines truck location, load data, routing, economics, weather risk, h
 - Agent Economics Dashboard
 - Analytics API
 - Per-agent revenue tracking
-- File-backed payment analytics persistence
+- Neon/Postgres payment analytics persistence
+- Drizzle-managed schema and migrations
 - OpenWeather Risk Agent with safe fallback
 - Historical lane intelligence with preset/mock data
 - Gemini-backed recommendations with local fallback logic
@@ -109,14 +110,19 @@ The dashboard shows:
 - Arc tx hashes
 - Explorer proof links
 
-Analytics persistence uses a small server-side file-backed store for the current deployment/runtime. It is suitable for the demo and local development; a production version should replace this with a durable database.
+Analytics persistence is backed by Neon/Postgres with a Drizzle-managed schema and migrations. The dashboard no longer relies only on runtime JSON files; the legacy server-side JSON analytics store remains available as an isolated compatibility fallback.
 
 ## Current Release
 
-v0.0.4 — 2026-05-30 09:34 UTC
+v0.0.4.a - 2026-05-31 09:04 UTC
 
 Release highlights:
 
+- Neon/Postgres analytics persistence
+- Drizzle schema and migrations
+- analysis_runs, agent_runs, and payment_records persistence
+- Legacy JSON analytics fallback
+- Dashboard copy updated for database-backed analytics
 - Autonomous Multi-Shipment Optimization
 - Shipment scoring engine
 - Ranked load recommendations
@@ -140,11 +146,10 @@ Release highlights:
 - Real USDC settlement on Arc: COMPLETE
 - Explorer proof display: COMPLETE
 - Agent Economics Dashboard: COMPLETE
-- Analytics persistence: COMPLETE
+- Neon/Postgres analytics persistence: COMPLETE
 - Grant pitch page: COMPLETE
 - Embedded demo video: COMPLETE
 - Manual load entry/import: NEXT
-- Durable analytics database: NEXT
 - Autonomous dispatch workflows: NEXT
 
 ## Data and Integrations
@@ -157,13 +162,15 @@ Release highlights:
 - Fuel prices are preset by state for the MVP and do not call a paid fuel API.
 - Circle Developer Controlled Wallets are used for server-side USDC payment execution.
 - Arc settlement proof is displayed through tx hash and explorer links when returned by Circle.
+- Neon/Postgres stores analytics persistence through Drizzle-managed schema and migrations.
+- Runtime JSON analytics remains available only as a legacy fallback.
 - Load board APIs are intentionally deferred; manual load entry and import are planned later.
 
 ## Known Limitations
 
 - Demo truck and load data is preset.
 - Historical lane intelligence is preset/mock data.
-- Analytics persistence is file-backed and runtime-scoped, not a durable production database.
+- Analytics persistence is database-backed, with runtime JSON retained only as a fallback.
 - Weather risk is intentionally conservative and uses fallback behavior when live weather is unavailable.
 - Load board integrations, user accounts, and manual load entry are deferred.
 - The system remains dispatcher-first; AI recommends, while humans decide.
