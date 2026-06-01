@@ -118,18 +118,20 @@ export default function RecentPaymentsTable({
 }) {
   const [activeFilter, setActiveFilter] = useState<PaymentFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportFromDate, setExportFromDate] = useState("");
+  const [exportToDate, setExportToDate] = useState("");
+  const [exportError, setExportError] = useState<string | null>(null);
   const filteredPayments = useMemo(
     () => payments.filter((payment) => matchesPaymentFilter(payment, activeFilter)),
     [activeFilter, payments],
   );
   const exportPayments = useMemo(
     () =>
-      filteredPayments.filter((payment) =>
-        matchesDateRange(payment, fromDate, toDate),
+      payments.filter((payment) =>
+        matchesDateRange(payment, exportFromDate, exportToDate),
       ),
-    [filteredPayments, fromDate, toDate],
+    [exportFromDate, exportToDate, payments],
   );
   const totalPages = Math.max(1, Math.ceil(filteredPayments.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -143,14 +145,25 @@ export default function RecentPaymentsTable({
     setCurrentPage(1);
   }
 
+  function closeExportPanel() {
+    setIsExportOpen(false);
+    setExportError(null);
+  }
+
   function downloadCsv() {
+    if (exportPayments.length === 0) {
+      setExportError("No payments match this export range.");
+      return;
+    }
+
     const csv = buildCsv(exportPayments);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
 
+    setExportError(null);
     anchor.href = url;
-    anchor.download = `arc-ai-logistics-payments-${activeFilter}-${new Date()
+    anchor.download = `arc-ai-logistics-payments-${new Date()
       .toISOString()
       .slice(0, 10)}.csv`;
     document.body.appendChild(anchor);
@@ -186,42 +199,70 @@ export default function RecentPaymentsTable({
               </button>
             ))}
           </div>
+          <button
+            className="w-fit rounded border border-gray-300 px-3 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            onClick={() => {
+              setIsExportOpen(true);
+              setExportError(null);
+            }}
+            type="button"
+          >
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      {isExportOpen && (
+        <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <h3 className="font-bold">Export payment history</h3>
           <div className="flex flex-wrap gap-2 text-sm text-gray-700">
             <label className="flex items-center gap-2">
-              <span>From</span>
+              <span>From date</span>
               <input
                 className="rounded border border-gray-300 px-2 py-1"
-                onChange={(event) => setFromDate(event.target.value)}
+                onChange={(event) => {
+                  setExportFromDate(event.target.value);
+                  setExportError(null);
+                }}
                 type="date"
-                value={fromDate}
+                value={exportFromDate}
               />
             </label>
             <label className="flex items-center gap-2">
-              <span>To</span>
+              <span>To date</span>
               <input
                 className="rounded border border-gray-300 px-2 py-1"
-                onChange={(event) => setToDate(event.target.value)}
+                onChange={(event) => {
+                  setExportToDate(event.target.value);
+                  setExportError(null);
+                }}
                 type="date"
-                value={toDate}
+                value={exportToDate}
               />
             </label>
             <button
-              className="rounded border border-gray-300 px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
-              disabled={exportPayments.length === 0}
+              className="rounded border border-gray-300 bg-white px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50"
+              onClick={closeExportPanel}
+              type="button"
+            >
+              Cancel / Close
+            </button>
+            <button
+              className="rounded border border-black bg-black px-3 py-1 font-semibold text-white hover:bg-gray-800"
               onClick={downloadCsv}
               type="button"
             >
               Download CSV
             </button>
           </div>
+          {exportError && <p className="text-sm text-red-700">{exportError}</p>}
         </div>
-      </div>
+      )}
 
       <div className="flex flex-col gap-2 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
         <p>
           Showing {visibleRangeStart}-{visibleRangeEnd} of {filteredPayments.length} transactions
-          {activeFilter !== "all" ? ` (${activeFilter})` : ""}. CSV export matches
-          the selected status and date range across the fetched payment records.
+          {activeFilter !== "all" ? ` (${activeFilter})` : ""}.
         </p>
         <div className="flex items-center gap-2">
           <button
