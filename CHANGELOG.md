@@ -2,13 +2,16 @@
 
 ## v0.0.5.a - 2026-06-01
 
-Scenario Lab MVP for safe sample CSV-based logistics matching.
+Scenario Lab MVP for hidden experimental local CSV-based logistics matching.
 
-- Added Scenario Lab MVP.
-- Added sample CSV-based load/truck matching.
+- Added hidden experimental /scenario-lab route.
+- Added sample CSV-based local truck/load matching simulation.
+- Added 50-load and 5-truck sample dataset.
 - Added 0-3 recommendations per truck.
-- Added simulated contact shipper action.
-- No changes to Circle payment flow, Gemini integration, or database schema.
+- Added row-level CSV validation warnings.
+- Added simulated Contact shipper action.
+- Scenario Lab is not yet connected to Circle payments, Gemini, Neon persistence, or dashboard observability.
+- No changes to Circle payment flow, Gemini integration, database schema, migrations, or dashboard logic.
 
 ## v0.0.4.b - 2026-06-01 08:58 UTC
 
