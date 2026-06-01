@@ -6,6 +6,16 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: "v0.0.5.b",
+    date: "2026-06-01",
+    changes: [
+      "Updated /grant Current Release block to v0.0.5.b",
+      "Clarified Scenario Lab status as hidden experimental local simulation",
+      "Added release consistency note across public release surfaces",
+      "No changes to Circle payment flow, Gemini integration, database schema, migrations, dashboard logic, or Scenario Lab matching logic",
+    ],
+  },
+  {
     version: "v0.0.5.a",
     date: "2026-06-01",
     changes: [
