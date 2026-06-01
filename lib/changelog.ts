@@ -9,11 +9,14 @@ export const changelogEntries: ChangelogEntry[] = [
     version: "v0.0.5.a",
     date: "2026-06-01",
     changes: [
-      "Added Scenario Lab MVP",
-      "Added sample CSV-based load/truck matching",
+      "Added hidden experimental /scenario-lab route",
+      "Added sample CSV-based local truck/load matching simulation",
+      "Added 50-load and 5-truck sample dataset",
       "Added 0-3 recommendations per truck",
-      "Added simulated contact shipper action",
-      "No changes to Circle payment flow, Gemini integration, or database schema",
+      "Added row-level CSV validation warnings",
+      "Added simulated Contact shipper action",
+      "Scenario Lab is not yet connected to Circle payments, Gemini, Neon persistence, or dashboard observability",
+      "No changes to Circle payment flow, Gemini integration, database schema, migrations, or dashboard logic",
     ],
   },
   {
