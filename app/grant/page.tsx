@@ -35,7 +35,7 @@ const milestones = [
   {
     title: "Milestone 7 — Agent Economics Dashboard",
     status: "COMPLETE",
-    body: "Added a dedicated analytics dashboard showing Total Payments, Total USDC Spent, Average Cost per Analysis, Total Analyses, Per-Agent Revenue, Recent Payments, Transaction IDs, Transaction Hashes, and Arc Explorer Proof Links. Analytics records are persisted using the current file-backed analytics store.",
+    body: "Added a dedicated analytics dashboard showing Total Payments, Total USDC Spent, Average Cost per Analysis, Total Analyses, Per-Agent Revenue, payment lifecycle filters, full payment history visibility, CSV export, Transaction IDs, Transaction Hashes, and Arc Explorer Proof Links. Analytics records are persisted through Neon/Postgres with the legacy JSON store retained as fallback.",
   },
   {
     title: "Milestone 8 — Real Freight Data Integration",
@@ -66,6 +66,8 @@ const implementedItems = [
   "Arc Settlement Proof",
   "Multi-Shipment Optimization",
   "Agent Economics Dashboard",
+  "Payment Status Filters",
+  "CSV Export",
   "Analytics Persistence",
 ];
 
@@ -210,10 +212,11 @@ export default function GrantPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Current Release
               </p>
-              <h2 className="text-2xl font-bold">v0.0.4</h2>
+              <h2 className="text-2xl font-bold">v0.0.4.b</h2>
               <p className="max-w-2xl text-sm leading-6 text-gray-700">
                 The current release includes real payment proof, multi-shipment
-                optimization, and analytics visibility for paid agent runs.
+                optimization, database-backed analytics, payment status filtering,
+                full payment history visibility, and CSV export for visible records.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:min-w-[28rem]">
