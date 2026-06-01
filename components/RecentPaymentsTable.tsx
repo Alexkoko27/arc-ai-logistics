@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { RecentPaymentRecord } from "@/lib/analytics/types";
 
-const previewLimit = 10;
+const pageSize = 10;
 
 type PaymentFilter = "all" | "cleared" | "pending" | "failed";
 
@@ -59,6 +59,27 @@ function matchesPaymentFilter(payment: RecentPaymentRecord, filter: PaymentFilte
   return payment.status === "PENDING" || payment.status === "INITIATED";
 }
 
+function parseDateInput(value: string, boundary: "start" | "end") {
+  if (!value) return null;
+
+  const timestamp = boundary === "start" ? `${value}T00:00:00.000Z` : `${value}T23:59:59.999Z`;
+  const date = new Date(timestamp);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function matchesDateRange(payment: RecentPaymentRecord, fromDate: string, toDate: string) {
+  const paymentDate = new Date(payment.timestamp);
+  const rangeStart = parseDateInput(fromDate, "start");
+  const rangeEnd = parseDateInput(toDate, "end");
+
+  if (Number.isNaN(paymentDate.getTime())) return false;
+  if (rangeStart && paymentDate < rangeStart) return false;
+  if (rangeEnd && paymentDate > rangeEnd) return false;
+
+  return true;
+}
+
 function csvCell(value: string | number | null) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
@@ -94,23 +115,32 @@ export default function RecentPaymentsTable({
   payments: RecentPaymentRecord[];
 }) {
   const [activeFilter, setActiveFilter] = useState<PaymentFilter>("all");
-  const [showAll, setShowAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const filteredPayments = useMemo(
     () => payments.filter((payment) => matchesPaymentFilter(payment, activeFilter)),
     [activeFilter, payments],
   );
-  const visiblePayments = showAll
-    ? filteredPayments
-    : filteredPayments.slice(0, previewLimit);
-  const hasMore = filteredPayments.length > previewLimit;
+  const exportPayments = useMemo(
+    () =>
+      filteredPayments.filter((payment) =>
+        matchesDateRange(payment, fromDate, toDate),
+      ),
+    [filteredPayments, fromDate, toDate],
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = (safeCurrentPage - 1) * pageSize;
+  const visiblePayments = filteredPayments.slice(pageStart, pageStart + pageSize);
 
   function selectFilter(filter: PaymentFilter) {
     setActiveFilter(filter);
-    setShowAll(false);
+    setCurrentPage(1);
   }
 
   function downloadCsv() {
-    const csv = buildCsv(visiblePayments);
+    const csv = buildCsv(exportPayments);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -135,7 +165,7 @@ export default function RecentPaymentsTable({
             and explorer proof links.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <div className="flex flex-col gap-2 sm:items-end">
           <div className="flex flex-wrap gap-2" aria-label="Payment status filters">
             {filterOptions.map((option) => (
               <button
@@ -152,31 +182,64 @@ export default function RecentPaymentsTable({
               </button>
             ))}
           </div>
-          <button
-            className="rounded border border-gray-300 px-3 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
-            disabled={visiblePayments.length === 0}
-            onClick={downloadCsv}
-            type="button"
-          >
-            Download CSV
-          </button>
+          <div className="flex flex-wrap gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2">
+              <span>From</span>
+              <input
+                className="rounded border border-gray-300 px-2 py-1"
+                onChange={(event) => setFromDate(event.target.value)}
+                type="date"
+                value={fromDate}
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              <span>To</span>
+              <input
+                className="rounded border border-gray-300 px-2 py-1"
+                onChange={(event) => setToDate(event.target.value)}
+                type="date"
+                value={toDate}
+              />
+            </label>
+            <button
+              className="rounded border border-gray-300 px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+              disabled={exportPayments.length === 0}
+              onClick={downloadCsv}
+              type="button"
+            >
+              Download CSV
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="flex flex-col gap-2 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
         <p>
           Showing {visiblePayments.length} of {filteredPayments.length} transactions
-          {activeFilter !== "all" ? ` (${activeFilter})` : ""}.
+          {activeFilter !== "all" ? ` (${activeFilter})` : ""}. CSV export matches
+          the selected status and date range across the fetched payment records.
         </p>
-        {hasMore && (
+        <div className="flex items-center gap-2">
           <button
-            className="w-fit font-semibold underline underline-offset-4"
-            onClick={() => setShowAll((value) => !value)}
+            className="rounded border border-gray-300 px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
             type="button"
           >
-            {showAll ? "Show latest 10" : "View all transactions"}
+            Previous page
           </button>
-        )}
+          <span>
+            Page {safeCurrentPage} of {totalPages}
+          </span>
+          <button
+            className="rounded border border-gray-300 px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            type="button"
+          >
+            Next page
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
