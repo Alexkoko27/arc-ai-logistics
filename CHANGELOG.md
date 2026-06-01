@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.0.5.b - 2026-06-01
+
+Release consistency and grant page polish for Scenario Lab visibility.
+
+- Updated /grant Current Release block to v0.0.5.b.
+- Clarified Scenario Lab status as hidden experimental local simulation.
+- Added release consistency note across public release surfaces.
+- No changes to Circle payment flow, Gemini integration, database schema, migrations, dashboard logic, or Scenario Lab matching logic.
+
 ## v0.0.5.a - 2026-06-01
 
 Scenario Lab MVP for hidden experimental local CSV-based logistics matching.

@@ -23,7 +23,7 @@ The demo combines truck location, load data, routing, economics, weather risk, h
 - Shipment scoring engine
 - Ranked load recommendations
 - Compare-all-loads view
-- Scenario Lab MVP
+- Hidden experimental Scenario Lab MVP
 - CSV-based sample load/truck matching
 - Simulated shipper contact flow
 - Circle USDC payments
@@ -72,13 +72,13 @@ AI Agent System: GPS, shipment, route, economics, risk, weather, historical lane
 ## Current Demo Flow
 
 Truck
-→ Load
-→ Agent Analysis
-→ BOOK / WAIT / SKIP
-→ Circle Payment
-→ Arc Settlement
-→ Explorer Proof
-→ Analytics Dashboard
+-> Load
+-> Agent Analysis
+-> BOOK / WAIT / SKIP
+-> Circle Payment
+-> Arc Settlement
+-> Explorer Proof
+-> Analytics Dashboard
 
 The current demo starts with 3 preset US dry van trucks and 10 preset US dry van loads across Texas, Illinois, and Georgia. Agents evaluate routing, economics, risk, weather, lane history, and payment proof before surfacing dispatch recommendations and analytics.
 
@@ -139,10 +139,14 @@ Analytics persistence is backed by Neon/Postgres with a Drizzle-managed schema a
 
 ## Current Release
 
-v0.0.5.a - 2026-06-01
+v0.0.5.b - 2026-06-01
 
 Release highlights:
 
+- Updated `/grant` Current Release block to v0.0.5.b
+- Clarified Scenario Lab status as hidden experimental local simulation
+- Added release consistency note across public release surfaces
+- No changes to Circle payment flow, Gemini integration, database schema, migrations, dashboard logic, or Scenario Lab matching logic
 - Hidden experimental `/scenario-lab` route
 - Sample CSV-based local truck/load matching simulation
 - 50-load and 5-truck sample dataset
@@ -150,7 +154,6 @@ Release highlights:
 - Row-level CSV validation warnings
 - Simulated Contact shipper action
 - Scenario Lab is not yet connected to Circle payments, Gemini, Neon persistence, or dashboard observability
-- No changes to Circle payment flow, Gemini integration, database schema, migrations, or dashboard logic
 - Payment status filtering for All, Cleared, Pending, and Failed records
 - Paginated payment history from the existing analytics data source
 - CSV export for payment records matching an optional date range
@@ -239,7 +242,7 @@ Release highlights:
 
 ## Project Notes
 
-- [Future architecture notes](docs/FUTURE_IDEAS.md) — deferred ideas, resilience scenarios, AI provider abstraction, emergency dispatch mode, and future marketplace concepts.
+- [Future architecture notes](docs/FUTURE_IDEAS.md) - deferred ideas, resilience scenarios, AI provider abstraction, emergency dispatch mode, and future marketplace concepts.
 
 ## Tech Stack
 

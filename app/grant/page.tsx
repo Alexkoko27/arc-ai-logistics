@@ -3,42 +3,42 @@ import Link from "next/link";
 
 const milestones = [
   {
-    title: "Milestone 1 — Live AI Logistics Demo",
+    title: "Milestone 1 - Live AI Logistics Demo",
     status: "COMPLETE",
     body: "Built and deployed a working public demo of an AI-powered logistics dispatcher. The current demo includes shipment selection, map view, agent cards, route/economics/risk analysis, BOOK/SKIP recommendation, and a paid agent run panel.",
   },
   {
-    title: "Milestone 2 — Agent Payment Ledger",
+    title: "Milestone 2 - Agent Payment Ledger",
     status: "COMPLETE",
     body: "Added a USDC-denominated ledger for the agent run. The UI now shows per-agent execution costs for GPS, Route, Economics, and Risk agents, plus the total agent run cost of 0.005 USDC.",
   },
   {
-    title: "Milestone 3 — Grant-Ready Public Pitch",
+    title: "Milestone 3 - Grant-Ready Public Pitch",
     status: "COMPLETE",
     body: "Added project positioning, architecture diagram, /grant page, Circle/Arc framing, and demo video outline. The project now has a clearer public explanation for ecosystem reviewers and grant submission.",
   },
   {
-    title: "Milestone 4 — Real Arc Testnet Settlement",
+    title: "Milestone 4 - Real Arc Testnet Settlement",
     status: "COMPLETE",
     body: "Real Arc testnet settlement is implemented. Each paid agent run produces a real transaction ID, transaction hash, status lifecycle, and Arc Explorer-confirmed proof.",
   },
   {
-    title: "Milestone 5 — Circle Developer Controlled Wallet Integration",
+    title: "Milestone 5 - Circle Developer Controlled Wallet Integration",
     status: "COMPLETE",
     body: "Circle Developer Controlled Wallets are integrated. Agent payments are initiated and tracked through Circle without exposing private keys.",
   },
   {
-    title: "Milestone 6 — Autonomous Multi-Shipment Optimization",
+    title: "Milestone 6 - Autonomous Multi-Shipment Optimization",
     status: "COMPLETE",
     body: "The system now compares multiple truck/load opportunities, calculates scores, ranks options, and recommends the best shipment automatically.",
   },
   {
-    title: "Milestone 7 — Agent Economics Dashboard",
+    title: "Milestone 7 - Agent Economics Dashboard",
     status: "COMPLETE",
     body: "Added a dedicated analytics dashboard showing Total Payments, Total USDC Spent, Average Cost per Analysis, Total Analyses, Per-Agent Revenue, payment lifecycle filters, full payment history visibility, CSV export, Transaction IDs, Transaction Hashes, and Arc Explorer Proof Links. Analytics records are persisted through Neon/Postgres with the legacy JSON store retained as fallback.",
   },
   {
-    title: "Milestone 8 — Real Freight Data Integration",
+    title: "Milestone 8 - Real Freight Data Integration",
     status: "NEXT",
     body: "Replace demo logistics inputs with production-grade external data sources: real freight marketplace integrations, real weather feeds, real route intelligence, real GPS/fleet telemetry, improved dispatch recommendations, and higher confidence agent decisions. Expected outcome: the platform evaluates live freight opportunities instead of demo datasets while preserving the existing Circle payment and Arc settlement architecture.",
   },
@@ -69,6 +69,8 @@ const implementedItems = [
   "Payment Status Filters",
   "CSV Export",
   "Analytics Persistence",
+  "Hidden Experimental Scenario Lab",
+  "Scenario Lab Local Simulation",
 ];
 
 function statusClass(status: string) {
@@ -212,11 +214,13 @@ export default function GrantPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Current Release
               </p>
-              <h2 className="text-2xl font-bold">v0.0.4.b</h2>
+              <h2 className="text-2xl font-bold">v0.0.5.b</h2>
               <p className="max-w-2xl text-sm leading-6 text-gray-700">
-                The current release includes real payment proof, multi-shipment
-                optimization, database-backed analytics, payment status filtering,
-                full payment history visibility, and CSV export for visible records.
+                The current release keeps the public release surfaces aligned and
+                clarifies Scenario Lab as a hidden experimental local simulation.
+                It still includes real payment proof, multi-shipment optimization,
+                database-backed analytics, payment status filtering, full payment
+                history visibility, and CSV export for visible records.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:min-w-[28rem]">
@@ -265,7 +269,7 @@ export default function GrantPage() {
               </p>
               <h2 className="text-2xl font-bold">Demo Video</h2>
               <p className="text-gray-700">
-                Short walkthrough of Arc AI Logistics — a multi-agent freight coordination demo powered by Circle and Arc.
+                Short walkthrough of Arc AI Logistics - a multi-agent freight coordination demo powered by Circle and Arc.
               </p>
               <p className="text-gray-700">
                 The video demonstrates how AI agents evaluate shipment opportunities using GPS data, route intelligence, economics, and risk analysis, then coordinate a USDC-denominated paid agent run with on-chain proof simulation.
