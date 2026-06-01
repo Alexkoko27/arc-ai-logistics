@@ -10,8 +10,8 @@ export const changelogEntries: ChangelogEntry[] = [
     date: "2026-06-01 08:58 UTC",
     changes: [
       "Added payment status filtering for All, Cleared, Pending, and Failed records",
-      "Added full payment history visibility from the existing analytics data source",
-      "Added CSV export for the currently visible transaction set",
+      "Added paginated payment history visibility from the existing analytics data source",
+      "Added CSV export for matching status and date-range criteria across fetched payment records",
       "Improved visibility into Pending, Failed, and Cleared payment lifecycle states",
       "Updated public release labels and documentation for v0.0.4.b",
     ],
