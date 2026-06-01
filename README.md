@@ -33,8 +33,8 @@ The demo combines truck location, load data, routing, economics, weather risk, h
 - Neon/Postgres payment analytics persistence
 - Drizzle-managed schema and migrations
 - Payment status filtering
-- Full payment history visibility
-- CSV payment export
+- Paginated payment history visibility
+- CSV payment export by status and date range
 - OpenWeather Risk Agent with safe fallback
 - Historical lane intelligence with preset/mock data
 - Gemini-backed recommendations with local fallback logic
@@ -109,8 +109,8 @@ The dashboard shows:
 - Total Analyses
 - Per-agent revenue
 - Payment status filters for All, Cleared, Pending, and Failed records
-- Full payment history visibility through the existing analytics data source
-- CSV export for the currently visible transaction set
+- Paginated payment history through the existing analytics data source
+- CSV export for matching status and date-range criteria across fetched payment records
 - Circle transaction IDs
 - Arc tx hashes
 - Explorer proof links
@@ -124,8 +124,8 @@ v0.0.4.b - 2026-06-01 08:58 UTC
 Release highlights:
 
 - Payment status filtering for All, Cleared, Pending, and Failed records
-- Full payment history visibility from the existing analytics data source
-- CSV export for the currently visible transaction set
+- Paginated payment history from the existing analytics data source
+- CSV export for matching status and date-range criteria across fetched payment records
 - Improved Pending / Failed / Cleared payment lifecycle visibility
 - Neon/Postgres analytics persistence
 - Drizzle schema and migrations
