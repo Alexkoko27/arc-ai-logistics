@@ -544,7 +544,7 @@ export default function ScenarioLabPage() {
             </span>
           </div>
           <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
-            Upload or load a sample logistics scenario to see how AI-assisted agents can match trucks with available loads. Contact actions are simulated.
+            Load a sample logistics scenario to see how AI-assisted matching can pair trucks with available loads. Contact actions are simulated.
           </p>
           <p className="max-w-3xl rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-800">
             Scenario Lab is a local sandbox for testing CSV-based truck/load matching. In v0.0.5.a, matching runs in the browser and does not create a paid agent run.
