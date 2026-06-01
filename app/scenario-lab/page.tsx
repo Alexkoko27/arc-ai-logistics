@@ -130,7 +130,8 @@ function parseCsv(text: string, fileLabel: string, expectedHeaders: string[]): P
     return { rows: [], warnings: [`${fileLabel}: file is empty.`] };
   }
 
-  const [headerLine, ...rows] = trimmedText.split(/\r?\n/);
+  const [rawHeaderLine, ...rawRows] = trimmedText.split(/\r?\n/);
+  const headerLine = rawHeaderLine.replace(/^\uFEFF/, "");
   const expectedHeaderLine = expectedHeaders.join(",");
 
   if (headerLine.trim() !== expectedHeaderLine) {
@@ -143,13 +144,17 @@ function parseCsv(text: string, fileLabel: string, expectedHeaders: string[]): P
     };
   }
 
+  const rows = rawRows
+    .map((row, index) => ({ row, rowNumber: index + 2 }))
+    .filter(({ row }) => row.trim().length > 0);
+
   return {
-    rows: rows.filter(Boolean).map((row) => {
+    rows: rows.map(({ row, rowNumber }) => {
       const values = splitCsvLine(row);
 
       if (values.length !== expectedHeaders.length) {
         warnings.push(
-          `${fileLabel} row ${rows.indexOf(row) + 2}: expected ${expectedHeaders.length} columns but found ${values.length}.`,
+          `${fileLabel} row ${rowNumber}: expected ${expectedHeaders.length} columns but found ${values.length}.`,
         );
       }
 
@@ -338,9 +343,12 @@ function haversineMiles(fromLat: number, fromLng: number, toLat: number, toLng: 
   const lngDelta = degreesToRadians(toLng - fromLng);
   const startLat = degreesToRadians(fromLat);
   const endLat = degreesToRadians(toLat);
-  const a =
+  const a = clamp(
     Math.sin(latDelta / 2) ** 2 +
-    Math.cos(startLat) * Math.cos(endLat) * Math.sin(lngDelta / 2) ** 2;
+      Math.cos(startLat) * Math.cos(endLat) * Math.sin(lngDelta / 2) ** 2,
+    0,
+    1,
+  );
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return earthRadiusMiles * c;
@@ -423,6 +431,15 @@ function formatCurrency(value: number) {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatCurrencyWithCents(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -665,7 +682,7 @@ export default function ScenarioLabPage() {
                         <td className="py-2 pr-3">{truck.available_date}</td>
                         <td className="py-2 pr-3">{truck.equipment_type}</td>
                         <td className="py-2 pr-3">{truck.max_weight_lbs.toLocaleString()} lbs</td>
-                        <td className="py-2 pr-3">{formatCurrency(truck.cost_per_mile)}</td>
+                        <td className="py-2 pr-3">{formatCurrencyWithCents(truck.cost_per_mile)}</td>
                         <td className="py-2 pr-3">{truck.driver_hours_available}</td>
                         <td className="py-2 pr-3">{truck.home_base}</td>
                       </tr>
