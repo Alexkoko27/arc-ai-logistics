@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.0.5.a - 2026-06-01
+
+Scenario Lab MVP for hidden experimental local CSV-based logistics matching.
+
+- Added hidden experimental /scenario-lab route.
+- Added sample CSV-based local truck/load matching simulation.
+- Added 50-load and 5-truck sample dataset.
+- Added 0-3 recommendations per truck.
+- Added row-level CSV validation warnings.
+- Added simulated Contact shipper action.
+- Scenario Lab is not yet connected to Circle payments, Gemini, Neon persistence, or dashboard observability.
+- No changes to Circle payment flow, Gemini integration, database schema, migrations, or dashboard logic.
+
 ## v0.0.4.b - 2026-06-01 08:58 UTC
 
 Dashboard observability and release wording update for payment lifecycle visibility.
@@ -16,7 +29,7 @@ Database persistence wording and release note update for the Neon/Drizzle integr
 
 - Neon/Postgres analytics persistence is now active.
 - Drizzle schema and migrations added.
-- analysis_runs, agent_runs, payment_records persistence added.
+- analysis_runs, agent_runs, and payment_records persistence added.
 - Legacy JSON fallback retained.
 - Dashboard copy updated.
 

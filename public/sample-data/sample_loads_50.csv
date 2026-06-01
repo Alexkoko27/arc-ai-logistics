@@ -1,0 +1,51 @@
+load_id,origin_city,origin_state,origin_lat,origin_lng,destination_city,destination_state,destination_lat,destination_lng,pickup_date,delivery_date,miles,weight_lbs,rate_usd,equipment_type,commodity,priority,shipper_name
+L001,Phoenix,AZ,33.4484,-112.0740,New York,NY,40.7128,-74.0060,2026-06-09,2026-06-13,2461,12439,6300,Dry Van,Electronics,standard,Demo Shipper 258
+L002,Milwaukee,WI,43.0389,-87.9065,Cincinnati,OH,39.1031,-84.5120,2026-06-06,2026-06-07,373,17872,675,Dry Van,Packaged food,expedited,Demo Shipper 992
+L003,Little Rock,AR,34.7465,-92.2896,Des Moines,IA,41.5868,-93.6250,2026-06-07,2026-06-09,550,42224,1575,Dry Van,Consumer goods,standard,Demo Shipper 161
+L004,Salt Lake City,UT,40.7608,-111.8910,Columbus,OH,39.9612,-82.9988,2026-06-10,2026-06-14,1743,15913,4650,Dry Van,Paper products,standard,Demo Shipper 108
+L005,San Diego,CA,32.7157,-117.1611,Portland,OR,45.5152,-122.6784,2026-06-08,2026-06-09,1072,36431,2775,Reefer,Pharmaceuticals,standard,Demo Shipper 712
+L006,Salt Lake City,UT,40.7608,-111.8910,New Orleans,LA,29.9511,-90.0715,2026-06-05,2026-06-07,1647,36625,3750,Dry Van,Packaged food,expedited,Demo Shipper 698
+L007,Savannah,GA,32.0809,-81.0912,Chicago,IL,41.8781,-87.6298,2026-06-07,2026-06-09,882,32126,2925,Flatbed,Machinery,expedited,Demo Shipper 995
+L008,Houston,TX,29.7604,-95.3698,Denver,CO,39.7392,-104.9903,2026-06-05,2026-06-07,1010,16069,2150,Dry Van,Electronics,standard,Demo Shipper 143
+L009,Dallas,TX,32.7767,-96.7970,Chicago,IL,41.8781,-87.6298,2026-06-05,2026-06-06,925,23062,2375,Dry Van,Paper products,standard,Demo Shipper 136
+L010,Fresno,CA,36.7378,-119.7871,Columbus,OH,39.9612,-82.9988,2026-06-10,2026-06-15,2290,15377,5950,Dry Van,Electronics,standard,Demo Shipper 479
+L011,Atlanta,GA,33.7490,-84.3880,Baltimore,MD,39.2904,-76.6122,2026-06-08,2026-06-09,663,25685,1975,Dry Van,Electronics,expedited,Demo Shipper 114
+L012,New Orleans,LA,29.9511,-90.0715,Boston,MA,42.3601,-71.0589,2026-06-09,2026-06-12,1562,40193,3925,Dry Van,Paper products,standard,Demo Shipper 607
+L013,Minneapolis,MN,44.9778,-93.2650,Omaha,NE,41.2565,-95.9345,2026-06-10,2026-06-11,334,27193,1150,Flatbed,Pipe bundles,standard,Demo Shipper 251
+L014,Boston,MA,42.3601,-71.0589,Denver,CO,39.7392,-104.9903,2026-06-05,2026-06-09,2030,39838,4700,Dry Van,Electronics,standard,Demo Shipper 368
+L015,Salt Lake City,UT,40.7608,-111.8910,Seattle,WA,47.6062,-122.3321,2026-06-10,2026-06-11,805,39287,1700,Dry Van,Consumer goods,standard,Demo Shipper 246
+L016,Raleigh,NC,35.7796,-78.6382,Kansas City,MO,39.0997,-94.5786,2026-06-10,2026-06-12,1038,32830,2925,Dry Van,Packaged food,standard,Demo Shipper 519
+L017,Omaha,NE,41.2565,-95.9345,Houston,TX,29.7604,-95.3698,2026-06-08,2026-06-09,914,29790,2475,Dry Van,Consumer goods,standard,Demo Shipper 255
+L018,Dallas,TX,32.7767,-96.7970,Cincinnati,OH,39.1031,-84.5120,2026-06-05,2026-06-06,935,20725,2425,Dry Van,Packaged food,standard,Demo Shipper 514
+L019,Dallas,TX,32.7767,-96.7970,Boston,MA,42.3601,-71.0589,2026-06-05,2026-06-09,1782,24191,5875,Flatbed,Lumber,standard,Demo Shipper 410
+L020,St Louis,MO,38.6270,-90.1994,San Antonio,TX,29.4241,-98.4936,2026-06-07,2026-06-08,912,40669,2150,Dry Van,Furniture,standard,Demo Shipper 489
+L021,Albuquerque,NM,35.0844,-106.6504,San Diego,CA,32.7157,-117.1611,2026-06-09,2026-06-10,718,13962,1900,Dry Van,Furniture,expedited,Demo Shipper 639
+L022,Miami,FL,25.7617,-80.1918,Nashville,TN,36.1627,-86.7816,2026-06-06,2026-06-07,940,24042,2025,Dry Van,Paper products,standard,Demo Shipper 287
+L023,Milwaukee,WI,43.0389,-87.9065,Phoenix,AZ,33.4484,-112.0740,2026-06-06,2026-06-10,1681,12464,4900,Dry Van,Paper products,standard,Demo Shipper 680
+L024,Memphis,TN,35.1495,-90.0490,Milwaukee,WI,43.0389,-87.9065,2026-06-05,2026-06-07,641,13136,1350,Dry Van,Consumer goods,standard,Demo Shipper 824
+L025,Phoenix,AZ,33.4484,-112.0740,Indianapolis,IN,39.7684,-86.1581,2026-06-06,2026-06-10,1721,34665,4700,Reefer,Produce,standard,Demo Shipper 934
+L026,Savannah,GA,32.0809,-81.0912,Little Rock,AR,34.7465,-92.2896,2026-06-08,2026-06-09,772,44828,2050,Flatbed,Lumber,expedited,Demo Shipper 292
+L027,Albuquerque,NM,35.0844,-106.6504,Philadelphia,PA,39.9526,-75.1652,2026-06-10,2026-06-14,2011,28713,4525,Dry Van,Retail goods,standard,Demo Shipper 754
+L028,Los Angeles,CA,34.0522,-118.2437,New Orleans,LA,29.9511,-90.0715,2026-06-05,2026-06-09,1920,12577,4975,Dry Van,Consumer goods,standard,Demo Shipper 165
+L029,El Paso,TX,31.7619,-106.4850,Cincinnati,OH,39.1031,-84.5120,2026-06-07,2026-06-10,1533,37780,3775,Dry Van,Retail goods,expedited,Demo Shipper 465
+L030,Columbus,OH,39.9612,-82.9988,Louisville,KY,38.2527,-85.7585,2026-06-05,2026-06-06,218,38749,650,Flatbed,Construction materials,standard,Demo Shipper 657
+L031,Albuquerque,NM,35.0844,-106.6504,Kansas City,MO,39.0997,-94.5786,2026-06-08,2026-06-10,828,29602,2100,Dry Van,Electronics,standard,Demo Shipper 214
+L032,Des Moines,IA,41.5868,-93.6250,Phoenix,AZ,33.4484,-112.0740,2026-06-10,2026-06-13,1326,17661,2775,Dry Van,Retail goods,standard,Demo Shipper 404
+L033,Oklahoma City,OK,35.4676,-97.5164,Boston,MA,42.3601,-71.0589,2026-06-05,2026-06-08,1717,16743,4375,Dry Van,Consumer goods,standard,Demo Shipper 191
+L034,Des Moines,IA,41.5868,-93.6250,San Diego,CA,32.7157,-117.1611,2026-06-09,2026-06-11,1642,31266,3750,Dry Van,Packaged food,standard,Demo Shipper 970
+L035,Indianapolis,IN,39.7684,-86.1581,Tulsa,OK,36.1540,-95.9928,2026-06-09,2026-06-10,679,38606,1875,Dry Van,Paper products,standard,Demo Shipper 960
+L036,Albuquerque,NM,35.0844,-106.6504,Birmingham,AL,33.5186,-86.8104,2026-06-10,2026-06-12,1306,32000,3300,Dry Van,Paper products,standard,Demo Shipper 395
+L037,Dallas,TX,32.7767,-96.7970,Memphis,TN,35.1495,-90.0490,2026-06-09,2026-06-10,483,33108,1225,Flatbed,Machinery,standard,Demo Shipper 227
+L038,Memphis,TN,35.1495,-90.0490,Boston,MA,42.3601,-71.0589,2026-06-10,2026-06-12,1305,15962,4175,Reefer,Frozen food,standard,Demo Shipper 633
+L039,Houston,TX,29.7604,-95.3698,Nashville,TN,36.1627,-86.7816,2026-06-07,2026-06-08,765,23054,2550,Flatbed,Pipe bundles,standard,Demo Shipper 954
+L040,Indianapolis,IN,39.7684,-86.1581,Jacksonville,FL,30.3322,-81.6557,2026-06-06,2026-06-08,805,29753,2375,Reefer,Produce,standard,Demo Shipper 516
+L041,Minneapolis,MN,44.9778,-93.2650,Tulsa,OK,36.1540,-95.9928,2026-06-09,2026-06-10,720,34188,1850,Dry Van,Consumer goods,standard,Demo Shipper 218
+L042,Atlanta,GA,33.7490,-84.3880,Baltimore,MD,39.2904,-76.6122,2026-06-10,2026-06-11,663,28014,1525,Dry Van,Paper products,standard,Demo Shipper 625
+L043,Columbus,OH,39.9612,-82.9988,Savannah,GA,32.0809,-81.0912,2026-06-05,2026-06-07,638,41659,1700,Flatbed,Pipe bundles,expedited,Demo Shipper 832
+L044,Denver,CO,39.7392,-104.9903,El Paso,TX,31.7619,-106.4850,2026-06-05,2026-06-07,641,23331,1500,Dry Van,Furniture,standard,Demo Shipper 582
+L045,El Paso,TX,31.7619,-106.4850,Portland,OR,45.5152,-122.6784,2026-06-05,2026-06-08,1479,20051,3000,Dry Van,Packaged food,standard,Demo Shipper 985
+L051,Dallas,TX,32.7767,-96.7970,Atlanta,GA,33.7490,-84.3880,2026-06-05,2026-06-07,880,32000,2850,Dry Van,Retail goods,standard,Demo Shipper 501
+L052,Chicago,IL,41.8781,-87.6298,Nashville,TN,36.1627,-86.7816,2026-06-05,2026-06-06,470,22000,1550,Dry Van,Paper products,standard,Demo Shipper 502
+L053,Phoenix,AZ,33.4484,-112.0740,Los Angeles,CA,34.0522,-118.2437,2026-06-05,2026-06-06,373,28000,1250,Reefer,Produce,expedited,Demo Shipper 503
+L054,Columbus,OH,39.9612,-82.9988,Charlotte,NC,35.2271,-80.8431,2026-06-06,2026-06-07,430,30000,1450,Flatbed,Machinery,standard,Demo Shipper 504
+L055,Atlanta,GA,33.7490,-84.3880,Orlando,FL,28.5383,-81.3792,2026-06-05,2026-06-06,440,26000,1350,Dry Van,Consumer goods,standard,Demo Shipper 505

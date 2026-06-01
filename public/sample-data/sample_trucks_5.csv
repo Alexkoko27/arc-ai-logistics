@@ -1,0 +1,6 @@
+truck_id,current_city,current_state,current_lat,current_lng,available_date,equipment_type,max_weight_lbs,cost_per_mile,driver_hours_available,home_base
+T001,Dallas,TX,32.7767,-96.7970,2026-06-05,Dry Van,45000,1.55,11,Dallas TX
+T002,Chicago,IL,41.8781,-87.6298,2026-06-05,Dry Van,44000,1.62,10,Chicago IL
+T003,Phoenix,AZ,33.4484,-112.0740,2026-06-05,Reefer,42000,1.78,10,Phoenix AZ
+T004,Columbus,OH,39.9612,-82.9988,2026-06-06,Flatbed,48000,1.88,11,Columbus OH
+T005,Atlanta,GA,33.7490,-84.3880,2026-06-05,Dry Van,43000,1.58,9,Atlanta GA
