@@ -69,6 +69,8 @@ function parseDateInput(value: string, boundary: "start" | "end") {
 }
 
 function matchesDateRange(payment: RecentPaymentRecord, fromDate: string, toDate: string) {
+  if (!fromDate && !toDate) return true;
+
   const paymentDate = new Date(payment.timestamp);
   const rangeStart = parseDateInput(fromDate, "start");
   const rangeEnd = parseDateInput(toDate, "end");
@@ -133,6 +135,8 @@ export default function RecentPaymentsTable({
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * pageSize;
   const visiblePayments = filteredPayments.slice(pageStart, pageStart + pageSize);
+  const visibleRangeStart = filteredPayments.length === 0 ? 0 : pageStart + 1;
+  const visibleRangeEnd = pageStart + visiblePayments.length;
 
   function selectFilter(filter: PaymentFilter) {
     setActiveFilter(filter);
@@ -215,7 +219,7 @@ export default function RecentPaymentsTable({
 
       <div className="flex flex-col gap-2 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
         <p>
-          Showing {visiblePayments.length} of {filteredPayments.length} transactions
+          Showing {visibleRangeStart}-{visibleRangeEnd} of {filteredPayments.length} transactions
           {activeFilter !== "all" ? ` (${activeFilter})` : ""}. CSV export matches
           the selected status and date range across the fetched payment records.
         </p>
