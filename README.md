@@ -6,6 +6,7 @@ AI agents for freight coordination, paid with USDC on Arc.
 
 - Live Demo: https://arc-ai-logistics.vercel.app/
 - Grant Pitch Page: https://arc-ai-logistics.vercel.app/grant
+- Scenario Lab: https://arc-ai-logistics.vercel.app/scenario-lab
 - Demo Video: https://arc-ai-logistics.vercel.app/demo/arc-ai-logistics-demo.mp4
 - Release Notes: [CHANGELOG.md](CHANGELOG.md)
 
@@ -23,6 +24,9 @@ The demo combines truck location, load data, routing, economics, weather risk, h
 - Shipment scoring engine
 - Ranked load recommendations
 - Compare-all-loads view
+- Scenario Lab MVP
+- CSV-based sample load/truck matching
+- Simulated shipper contact flow
 - Circle USDC payments
 - Arc settlement proof
 - Explorer verification
@@ -79,6 +83,19 @@ Truck
 
 The current demo starts with 3 preset US dry van trucks and 10 preset US dry van loads across Texas, Illinois, and Georgia. Agents evaluate routing, economics, risk, weather, lane history, and payment proof before surfacing dispatch recommendations and analytics.
 
+## Scenario Lab
+
+The Scenario Lab is available at `/scenario-lab`. It is a safe demo sandbox for loading sample CSV logistics data and testing local matching recommendations without contacting real brokers or shippers.
+
+The bundled sample CSV files live in `public/sample-data/`:
+
+- `sample_loads_50.csv` contains 50 sample loads.
+- `sample_trucks_5.csv` contains 5 sample trucks.
+
+The page fetches those files in the browser, validates the exact expected headers, parses valid rows, and shows readable validation warnings for invalid rows. It then previews the sample loads and trucks, summarizes equipment types and available load revenue, and runs local matching with simple transparent logic.
+
+Matching recommendations require equipment compatibility, reject overweight loads, estimate empty miles with a haversine distance calculation, estimate truck cost, estimate profit, score each match from 0 to 100, and return 0-3 positive-profit recommendations per truck. The Contact shipper action is disabled and simulated; it does not send messages or call any real API.
+
 ## Why Arc + Circle
 
 Arc provides stablecoin-native infrastructure suited for programmable settlement and payment proof. USDC is used as the unit of account for paid agent execution.
@@ -119,10 +136,15 @@ Analytics persistence is backed by Neon/Postgres with a Drizzle-managed schema a
 
 ## Current Release
 
-v0.0.4.b - 2026-06-01 08:58 UTC
+v0.0.5.a - 2026-06-01
 
 Release highlights:
 
+- Scenario Lab MVP
+- Sample CSV-based load/truck matching
+- 0-3 recommendations per truck
+- Simulated contact shipper action
+- No changes to Circle payment flow, Gemini integration, or database schema
 - Payment status filtering for All, Cleared, Pending, and Failed records
 - Paginated payment history from the existing analytics data source
 - CSV export for payment records matching an optional date range
@@ -150,6 +172,7 @@ Release highlights:
 - AI logistics analysis: COMPLETE
 - Multi-agent recommendation flow: COMPLETE
 - Multi-shipment optimization: COMPLETE
+- Scenario Lab MVP: COMPLETE
 - Agent Payment Ledger: COMPLETE
 - Circle DCW payment flow: COMPLETE
 - Real USDC settlement on Arc: COMPLETE
@@ -160,6 +183,7 @@ Release highlights:
 - Neon/Postgres analytics persistence: COMPLETE
 - Grant pitch page: COMPLETE
 - Embedded demo video: COMPLETE
+- User CSV upload: NEXT
 - Manual load entry/import: NEXT
 - Autonomous dispatch workflows: NEXT
 
@@ -169,6 +193,7 @@ Release highlights:
 - OpenWeather is used server-side through `OPENWEATHER_API_KEY`; the key is never exposed to the browser.
 - The app runs safely without `OPENWEATHER_API_KEY` by using fallback weather risk.
 - Gemini is used for AI dispatch recommendations when configured, with local fallback recommendation logic when unavailable.
+- Scenario Lab uses bundled sample CSV files and local browser-side matching only.
 - Historical lane intelligence is preset/mock data for Texas, Illinois, and Georgia lanes.
 - Fuel prices are preset by state for the MVP and do not call a paid fuel API.
 - Circle Developer Controlled Wallets are used for server-side USDC payment execution.
@@ -180,6 +205,8 @@ Release highlights:
 ## Known Limitations
 
 - Demo truck and load data is preset.
+- Scenario Lab uses sample CSV data only and does not support user upload yet.
+- Scenario Lab contact actions are simulated and do not contact real brokers or shippers.
 - Historical lane intelligence is preset/mock data.
 - Analytics persistence is database-backed, with runtime JSON retained only as a fallback.
 - Weather risk is intentionally conservative and uses fallback behavior when live weather is unavailable.
@@ -188,6 +215,7 @@ Release highlights:
 
 ## Future Roadmap
 
+- User CSV upload for Scenario Lab
 - Manual load entry and CSV import
 - Durable analytics storage
 - Broker and lane history database
@@ -241,4 +269,4 @@ Never commit `.env.local`, API keys, entity secrets, wallet secrets, database UR
 
 ## Grant Reviewer Note
 
-Arc AI Logistics is a live demo and grant-ready prototype showing AI logistics analysis, USDC-denominated paid agent execution, real Circle DCW payments, Arc settlement proof, and payment analytics. The next step is to move from preset demo data toward durable production data, manual load entry, stronger history storage, and more autonomous dispatch workflows.
+Arc AI Logistics is a live demo and grant-ready prototype showing AI logistics analysis, USDC-denominated paid agent execution, real Circle DCW payments, Arc settlement proof, payment analytics, and a safe Scenario Lab sandbox for sample CSV-based logistics matching. The next step is to move from preset demo data toward durable production data, user CSV upload, stronger history storage, and more autonomous dispatch workflows.
