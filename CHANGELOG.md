@@ -5,8 +5,8 @@
 Dashboard observability and release wording update for payment lifecycle visibility.
 
 - Added payment status filtering for All, Cleared, Pending, and Failed records.
-- Added full payment history visibility from the existing analytics data source.
-- Added CSV export for the currently visible transaction set.
+- Added paginated payment history visibility from the existing analytics data source.
+- Added CSV export for matching status and date-range criteria across fetched payment records.
 - Improved dashboard visibility into Pending, Failed, and Cleared payment lifecycle states.
 - Updated public release labels and documentation for v0.0.4.b.
 
