@@ -84,8 +84,7 @@ export async function getDbAgentMetrics(): Promise<AgentMetrics> {
     .from(paymentRecords)
     .innerJoin(analysisRuns, eq(analysisRuns.id, paymentRecords.analysisRunId))
     .leftJoin(shipments, eq(shipments.id, analysisRuns.shipmentId))
-    .orderBy(desc(paymentRecords.createdAt))
-    .limit(10);
+    .orderBy(desc(paymentRecords.createdAt));
 
   const totalUsdcSpent = roundUsdc(toNumber(confirmedSummary?.totalUsdcSpent));
   const paidAnalyses = confirmedSummary?.paidAnalyses ?? 0;
