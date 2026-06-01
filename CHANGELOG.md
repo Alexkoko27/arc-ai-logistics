@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.0.4.b - 2026-06-01 08:58 UTC
+
+Dashboard observability and release wording update for payment lifecycle visibility.
+
+- Added payment status filtering for All, Cleared, Pending, and Failed records.
+- Added paginated payment history visibility from the existing analytics data source.
+- Added CSV export for payment records matching an optional date range.
+- Improved dashboard visibility into Pending, Failed, and Cleared payment lifecycle states.
+- Updated public release labels and documentation for v0.0.4.b.
+
 ## v0.0.4.a - 2026-05-31 09:04 UTC
 
 Database persistence wording and release note update for the Neon/Drizzle integration.

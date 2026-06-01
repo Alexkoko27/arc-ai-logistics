@@ -32,6 +32,9 @@ The demo combines truck location, load data, routing, economics, weather risk, h
 - Per-agent revenue tracking
 - Neon/Postgres payment analytics persistence
 - Drizzle-managed schema and migrations
+- Payment status filtering
+- Paginated payment history visibility
+- CSV payment export by date range
 - OpenWeather Risk Agent with safe fallback
 - Historical lane intelligence with preset/mock data
 - Gemini-backed recommendations with local fallback logic
@@ -105,19 +108,25 @@ The dashboard shows:
 - Average Cost per Analysis
 - Total Analyses
 - Per-agent revenue
-- Recent payment records
+- Payment status filters for All, Cleared, Pending, and Failed records
+- Paginated payment history through the existing analytics data source
+- CSV export for payment records matching an optional date range
 - Circle transaction IDs
 - Arc tx hashes
 - Explorer proof links
 
-Analytics persistence is backed by Neon/Postgres with a Drizzle-managed schema and migrations. The dashboard no longer relies only on runtime JSON files; the legacy server-side JSON analytics store remains available as an isolated compatibility fallback.
+Analytics persistence is backed by Neon/Postgres with a Drizzle-managed schema and migrations. The dashboard no longer relies only on runtime JSON files; the legacy server-side JSON analytics store remains available as an isolated compatibility fallback. v0.0.4.b improves visibility into Pending, Failed, and Cleared payment lifecycle states without changing payment execution logic.
 
 ## Current Release
 
-v0.0.4.a - 2026-05-31 09:04 UTC
+v0.0.4.b - 2026-06-01 08:58 UTC
 
 Release highlights:
 
+- Payment status filtering for All, Cleared, Pending, and Failed records
+- Paginated payment history from the existing analytics data source
+- CSV export for payment records matching an optional date range
+- Improved Pending / Failed / Cleared payment lifecycle visibility
 - Neon/Postgres analytics persistence
 - Drizzle schema and migrations
 - analysis_runs, agent_runs, and payment_records persistence
@@ -146,6 +155,8 @@ Release highlights:
 - Real USDC settlement on Arc: COMPLETE
 - Explorer proof display: COMPLETE
 - Agent Economics Dashboard: COMPLETE
+- Payment status filtering: COMPLETE
+- CSV payment export: COMPLETE
 - Neon/Postgres analytics persistence: COMPLETE
 - Grant pitch page: COMPLETE
 - Embedded demo video: COMPLETE
@@ -203,6 +214,8 @@ Release highlights:
 - AI agent orchestration / Gemini
 - Circle Developer Platform
 - Arc Testnet
+- Neon/Postgres
+- Drizzle ORM
 - Vercel
 
 ## Local Development
@@ -221,9 +234,10 @@ GEMINI_API_KEY=
 OPENWEATHER_API_KEY=
 CIRCLE_API_KEY=
 CIRCLE_ENTITY_SECRET=
+DATABASE_URL=
 ```
 
-Never commit `.env.local`, API keys, entity secrets, wallet secrets, or private keys.
+Never commit `.env.local`, API keys, entity secrets, wallet secrets, database URLs, or private keys.
 
 ## Grant Reviewer Note
 

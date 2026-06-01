@@ -184,6 +184,6 @@ export function getLegacyAgentMetrics(): AgentMetrics {
       ...agent,
       totalRevenue: roundUsdc(agent.amountPerRun * clearedRuns),
     })),
-    recentPayments: records.slice(0, 10),
+    recentPayments: records,
   };
 }
