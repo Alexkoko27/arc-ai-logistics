@@ -6,6 +6,17 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: "v0.0.4.b",
+    date: "2026-06-01 08:58 UTC",
+    changes: [
+      "Added payment status filtering for All, Cleared, Pending, and Failed records",
+      "Added full payment history visibility from the existing analytics data source",
+      "Added CSV export for the currently visible transaction set",
+      "Improved visibility into Pending, Failed, and Cleared payment lifecycle states",
+      "Updated public release labels and documentation for v0.0.4.b",
+    ],
+  },
+  {
     version: "v0.0.4.a",
     date: "2026-05-31 09:04 UTC",
     changes: [
