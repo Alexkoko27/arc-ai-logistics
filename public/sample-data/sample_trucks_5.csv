@@ -1,0 +1,6 @@
+truck_id,current_city,current_state,current_lat,current_lng,equipment_type,max_weight_lbs,cost_per_mile
+TRK-001,Dallas,TX,32.7767,-96.7970,Dry Van,45000,1.72
+TRK-002,Chicago,IL,41.8781,-87.6298,Reefer,43000,1.96
+TRK-003,Atlanta,GA,33.7490,-84.3880,Flatbed,48000,2.08
+TRK-004,Phoenix,AZ,33.4484,-112.0740,Dry Van,44000,1.81
+TRK-005,Columbus,OH,39.9612,-82.9988,Reefer,42000,1.89
