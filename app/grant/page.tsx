@@ -55,6 +55,8 @@ const demoItems = [
   "Arc Explorer proof",
   "Multi-shipment optimization",
   "Agent Economics Dashboard",
+  "Scenario Lab",
+  "CSV matching simulation",
   "Transaction IDs",
   "Transaction hashes",
 ];
@@ -69,7 +71,7 @@ const implementedItems = [
   "Payment Status Filters",
   "CSV Export",
   "Analytics Persistence",
-  "Hidden Experimental Scenario Lab",
+  "Experimental Scenario Lab",
   "Scenario Lab Local Simulation",
 ];
 
@@ -192,12 +194,20 @@ export default function GrantPage() {
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-2xl font-bold">Current Demo</h2>
-            <Link
-              className="inline-flex w-fit rounded-lg border border-black px-4 py-2 text-sm font-semibold hover:bg-black hover:text-white"
-              href="/"
-            >
-              Open Live Demo
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                className="inline-flex w-fit rounded-lg border border-black px-4 py-2 text-sm font-semibold hover:bg-black hover:text-white"
+                href="/"
+              >
+                Open Live Demo
+              </Link>
+              <Link
+                className="inline-flex w-fit rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50"
+                href="/scenario-lab"
+              >
+                Open Scenario Lab
+              </Link>
+            </div>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
             {demoItems.map((item) => (
@@ -216,11 +226,12 @@ export default function GrantPage() {
               </p>
               <h2 className="text-2xl font-bold">v0.0.5.b</h2>
               <p className="max-w-2xl text-sm leading-6 text-gray-700">
-                The current release keeps the public release surfaces aligned and
-                clarifies Scenario Lab as a hidden experimental local simulation.
-                It still includes real payment proof, multi-shipment optimization,
-                database-backed analytics, payment status filtering, full payment
-                history visibility, and CSV export for visible records.
+                The current release keeps public release surfaces aligned and
+                exposes Scenario Lab as an experimental local simulation for CSV-based
+                dispatcher testing. It still includes real payment proof,
+                multi-shipment optimization, database-backed analytics, payment
+                status filtering, full payment history visibility, and CSV export
+                for visible records.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:min-w-[28rem]">
