@@ -493,60 +493,82 @@ export default function Home() {
         </div>
       )}
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="space-y-3 rounded-xl border p-4">
-          <h2 className="font-bold">Demo Trucks</h2>
-          <div className="space-y-3">
+      <section className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,2.15fr)]">
+        <div className="space-y-2 rounded-xl border p-3">
+          <h2 className="text-sm font-bold">Demo Trucks</h2>
+          <div className="space-y-2">
             {demoData?.vehicles.map((vehicle) => (
               <label
-                className="block cursor-pointer rounded-lg border p-3 has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
+                className="block cursor-pointer rounded-lg border px-3 py-2 text-sm leading-snug transition has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
                 key={vehicle.id}
               >
-                <input
-                  className="mr-2"
-                  type="radio"
-                  name="vehicle"
-                  value={vehicle.id}
-                  checked={selectedVehicleId === vehicle.id}
-                  onChange={() => selectVehicle(vehicle.id)}
-                />
-                <span className="font-semibold">{vehicle.label}</span>
-                <div className="mt-2 space-y-1 text-sm text-gray-600">
-                  <p>Driver: {vehicle.driver}</p>
-                  <p>Location: {formatLocation(vehicle.location)}</p>
-                  <p>Status: {vehicle.status}</p>
-                  <p>MPG: {vehicle.mpg} | Driver: ${vehicle.driverRatePerMile}/mile</p>
-                  <p>Lanes: {vehicle.preferredLanes.join(", ")}</p>
+                <div className="flex items-start gap-2">
+                  <input
+                    className="mt-0.5"
+                    type="radio"
+                    name="vehicle"
+                    value={vehicle.id}
+                    checked={selectedVehicleId === vehicle.id}
+                    onChange={() => selectVehicle(vehicle.id)}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-semibold">{vehicle.label}</span>
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase text-gray-600">
+                        {vehicle.status}
+                      </span>
+                    </div>
+                    <p className="text-gray-700">
+                      {vehicle.driver} | {formatLocation(vehicle.location)}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      MPG {vehicle.mpg} | Driver ${vehicle.driverRatePerMile}/mile | Lanes:{" "}
+                      {vehicle.preferredLanes.join(", ")}
+                    </p>
+                  </div>
                 </div>
               </label>
             ))}
           </div>
         </div>
 
-        <div className="space-y-3 rounded-xl border p-4 xl:col-span-2">
-          <h2 className="font-bold">Load Board</h2>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="space-y-2 rounded-xl border p-3">
+          <h2 className="text-sm font-bold">Load Board</h2>
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
             {demoData?.shipments.slice(0, 6).map((shipment) => (
               <label
-                className="block cursor-pointer rounded-lg border p-3 has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
+                className="block cursor-pointer rounded-lg border px-3 py-2 text-sm leading-snug transition has-[:checked]:border-green-500 has-[:checked]:bg-green-50"
                 key={shipment.id}
               >
-                <input
-                  className="mr-2"
-                  type="radio"
-                  name="shipment"
-                  value={shipment.id}
-                  checked={selectedShipmentId === shipment.id}
-                  onChange={() => selectShipment(shipment.id)}
-                />
-                <span className="font-semibold">{shipment.reference}</span>
-                <div className="mt-2 space-y-1 text-sm text-gray-600">
-                  <p>Lane: {formatLane(shipment.origin, shipment.destination)}</p>
-                  <p>Commodity: {shipment.commodity}</p>
-                  <p>Weight: {shipment.weightLbs.toLocaleString()} lbs</p>
-                  <p>Revenue: {shipment.revenue} {shipment.currency}</p>
-                  <p>Pickup: {formatWindow(shipment.pickupWindowStart, shipment.pickupWindowEnd)}</p>
-                  <p>Delivery: {formatWindow(shipment.deliveryWindowStart, shipment.deliveryWindowEnd)}</p>
+                <div className="flex items-start gap-2">
+                  <input
+                    className="mt-0.5"
+                    type="radio"
+                    name="shipment"
+                    value={shipment.id}
+                    checked={selectedShipmentId === shipment.id}
+                    onChange={() => selectShipment(shipment.id)}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                      <span className="font-semibold">{shipment.reference}</span>
+                      <span className="font-semibold text-gray-800">
+                        {shipment.revenue} {shipment.currency}
+                      </span>
+                    </div>
+                    <p className="text-gray-700">
+                      {formatLane(shipment.origin, shipment.destination)}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {shipment.commodity} | {shipment.weightLbs.toLocaleString()} lbs
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Pickup: {formatWindow(shipment.pickupWindowStart, shipment.pickupWindowEnd)}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Delivery: {formatWindow(shipment.deliveryWindowStart, shipment.deliveryWindowEnd)}
+                    </p>
+                  </div>
                 </div>
               </label>
             ))}
