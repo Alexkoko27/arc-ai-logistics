@@ -219,13 +219,33 @@ const agentPaymentLedger = [
 const totalAgentPayment = "0.005 USDC";
 const demoLabel = "TESTNET LIVE DEMO -";
 const demoVersion = `${latestChangelogEntry.version} - ${latestChangelogEntry.date}`;
+const stateAbbreviations: Record<LocationState, string> = {
+  Texas: "TX",
+  Illinois: "IL",
+  Georgia: "GA",
+};
 
 function formatLocation(location: Coordinates) {
   return `${location.city}, ${location.state}`;
 }
 
+function formatCompactLocation(location: Coordinates) {
+  return `${location.city}, ${stateAbbreviations[location.state]}`;
+}
+
 function formatLane(origin: Coordinates, destination: Coordinates) {
   return `${formatLocation(origin)} -> ${formatLocation(destination)}`;
+}
+
+function formatCompactLane(origin: Coordinates, destination: Coordinates) {
+  return `${formatCompactLocation(origin)} -> ${formatCompactLocation(destination)}`;
+}
+
+function formatCompactPreferredLane(lane: string) {
+  return lane
+    .replace(/\bTexas\b/g, "TX")
+    .replace(/\bIllinois\b/g, "IL")
+    .replace(/\bGeorgia\b/g, "GA");
 }
 
 function formatMatchLane(match: RankedTruckLoadMatch) {
@@ -519,11 +539,11 @@ export default function Home() {
                       </span>
                     </div>
                     <p className="text-gray-700">
-                      {vehicle.driver} | {formatLocation(vehicle.location)}
+                      {vehicle.driver} | {formatCompactLocation(vehicle.location)}
                     </p>
                     <p className="text-xs text-gray-600">
                       MPG {vehicle.mpg} | Driver ${vehicle.driverRatePerMile}/mile | Lanes:{" "}
-                      {vehicle.preferredLanes.join(", ")}
+                      {vehicle.preferredLanes.map(formatCompactPreferredLane).join(", ")}
                     </p>
                   </div>
                 </div>
@@ -557,7 +577,7 @@ export default function Home() {
                       </span>
                     </div>
                     <p className="text-gray-700">
-                      {formatLane(shipment.origin, shipment.destination)}
+                      {formatCompactLane(shipment.origin, shipment.destination)}
                     </p>
                     <p className="text-xs text-gray-600">
                       {shipment.commodity} | {shipment.weightLbs.toLocaleString()} lbs
