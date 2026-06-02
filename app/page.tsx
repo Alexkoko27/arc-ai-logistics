@@ -425,15 +425,15 @@ export default function Home() {
             </div>
             <h1 className="text-2xl font-bold sm:text-3xl">Dispatcher Agent Control Center</h1>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link
-              className="text-sm font-semibold underline underline-offset-4"
+              className="inline-flex items-center text-sm font-semibold leading-none underline underline-offset-4"
               href="/dashboard"
             >
               Agent dashboard
             </Link>
             <Link
-              className="text-sm font-semibold underline underline-offset-4"
+              className="inline-flex items-center text-sm font-semibold leading-none underline underline-offset-4"
               href="/grant"
             >
               Circle grant pitch

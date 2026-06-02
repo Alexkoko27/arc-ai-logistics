@@ -43,6 +43,16 @@ type ParsedCsv = {
   warnings: string[];
 };
 
+type ParseSummary = {
+  loadRowsRead: number;
+  truckRowsRead: number;
+  loadsLoaded: number;
+  trucksLoaded: number;
+  loadsSkipped: number;
+  trucksSkipped: number;
+  warnings: number;
+};
+
 type Recommendation = {
   load: ScenarioLoad;
   emptyMiles: number;
@@ -95,6 +105,41 @@ const expectedTruckHeaders = [
   "driver_hours_available",
   "home_base",
 ];
+
+const fieldLabels: Record<string, string> = {
+  load_id: "load ID",
+  origin_city: "origin city",
+  origin_state: "origin state",
+  origin_lat: "origin latitude",
+  origin_lng: "origin longitude",
+  destination_city: "destination city",
+  destination_state: "destination state",
+  destination_lat: "destination latitude",
+  destination_lng: "destination longitude",
+  pickup_date: "pickup date",
+  delivery_date: "delivery date",
+  miles: "loaded miles",
+  weight_lbs: "load weight",
+  rate_usd: "load rate",
+  equipment_type: "equipment type",
+  commodity: "commodity",
+  priority: "priority",
+  shipper_name: "shipper name",
+  truck_id: "truck ID",
+  current_city: "current city",
+  current_state: "current state",
+  current_lat: "current latitude",
+  current_lng: "current longitude",
+  available_date: "available date",
+  max_weight_lbs: "maximum truck weight",
+  cost_per_mile: "truck cost per mile",
+  driver_hours_available: "driver hours available",
+  home_base: "home base",
+};
+
+function fieldLabel(field: string) {
+  return fieldLabels[field] ?? field.replaceAll("_", " ");
+}
 
 function splitCsvLine(line: string) {
   const values: string[] = [];
@@ -154,7 +199,7 @@ function parseCsv(text: string, fileLabel: string, expectedHeaders: string[]): P
 
       if (values.length !== expectedHeaders.length) {
         warnings.push(
-          `${fileLabel} row ${rowNumber}: expected ${expectedHeaders.length} columns but found ${values.length}.`,
+          `${fileLabel} row ${rowNumber} warning: expected ${expectedHeaders.length} columns but found ${values.length}.`,
         );
       }
 
@@ -177,7 +222,25 @@ function isDateLike(value: string) {
 }
 
 function validateText(row: Record<string, string>, fields: string[]) {
-  return fields.filter((field) => !row[field]?.trim()).map((field) => `${field} is required`);
+  return fields
+    .filter((field) => !row[field]?.trim())
+    .map((field) => `missing ${fieldLabel(field)}`);
+}
+
+function collectNumericIssues(row: Record<string, string>, fields: string[]) {
+  return fields.map((field) => {
+    const rawValue = row[field] ?? "";
+    const value = parseNumber(rawValue);
+
+    return {
+      field,
+      value,
+      issue: rawValue.trim() ? null : `missing ${fieldLabel(field)}`,
+    };
+  }).map((result) => ({
+    ...result,
+    issue: result.issue ?? (result.value === null ? `invalid ${fieldLabel(result.field)}` : null),
+  }));
 }
 
 function validateLoad(row: Record<string, string>, rowNumber: number) {
@@ -201,27 +264,31 @@ function validateLoad(row: Record<string, string>, rowNumber: number) {
     "weight_lbs",
     "rate_usd",
   ];
+  const numericResults = collectNumericIssues(row, numericFields);
   const numbers = Object.fromEntries(
-    numericFields.map((field) => [field, parseNumber(row[field] ?? "")]),
+    numericResults.map((result) => [result.field, result.value]),
   ) as Record<string, number | null>;
 
-  numericFields.forEach((field) => {
-    if (numbers[field] === null) issues.push(`${field} must be numeric`);
+  numericResults.forEach((result) => {
+    if (result.issue) issues.push(result.issue);
   });
 
   ["miles", "weight_lbs", "rate_usd"].forEach((field) => {
     if (numbers[field] !== null && numbers[field] <= 0) {
-      issues.push(`${field} must be greater than 0`);
+      issues.push(`${fieldLabel(field)} must be greater than 0`);
     }
   });
 
-  if (!isDateLike(row.pickup_date ?? "")) issues.push("pickup_date must use YYYY-MM-DD");
-  if (!isDateLike(row.delivery_date ?? "")) issues.push("delivery_date must use YYYY-MM-DD");
+  if (!row.pickup_date?.trim()) issues.push("missing pickup date");
+  else if (!isDateLike(row.pickup_date)) issues.push("invalid pickup date, expected YYYY-MM-DD");
+
+  if (!row.delivery_date?.trim()) issues.push("missing delivery date");
+  else if (!isDateLike(row.delivery_date)) issues.push("invalid delivery date, expected YYYY-MM-DD");
 
   if (issues.length > 0) {
     return {
       load: null,
-      warning: `sample_loads_50.csv row ${rowNumber}: ${issues.join("; ")}.`,
+      warning: `Row ${rowNumber} skipped in sample_loads_50.csv: ${issues.join("; ")}.`,
     };
   }
 
@@ -266,26 +333,28 @@ function validateTruck(row: Record<string, string>, rowNumber: number) {
     "cost_per_mile",
     "driver_hours_available",
   ];
+  const numericResults = collectNumericIssues(row, numericFields);
   const numbers = Object.fromEntries(
-    numericFields.map((field) => [field, parseNumber(row[field] ?? "")]),
+    numericResults.map((result) => [result.field, result.value]),
   ) as Record<string, number | null>;
 
-  numericFields.forEach((field) => {
-    if (numbers[field] === null) issues.push(`${field} must be numeric`);
+  numericResults.forEach((result) => {
+    if (result.issue) issues.push(result.issue);
   });
 
   ["max_weight_lbs", "cost_per_mile", "driver_hours_available"].forEach((field) => {
     if (numbers[field] !== null && numbers[field] <= 0) {
-      issues.push(`${field} must be greater than 0`);
+      issues.push(`${fieldLabel(field)} must be greater than 0`);
     }
   });
 
-  if (!isDateLike(row.available_date ?? "")) issues.push("available_date must use YYYY-MM-DD");
+  if (!row.available_date?.trim()) issues.push("missing available date");
+  else if (!isDateLike(row.available_date)) issues.push("invalid available date, expected YYYY-MM-DD");
 
   if (issues.length > 0) {
     return {
       truck: null,
-      warning: `sample_trucks_5.csv row ${rowNumber}: ${issues.join("; ")}.`,
+      warning: `Row ${rowNumber} skipped in sample_trucks_5.csv: ${issues.join("; ")}.`,
     };
   }
 
@@ -459,6 +528,7 @@ export default function ScenarioLabPage() {
   const [loads, setLoads] = useState<ScenarioLoad[]>([]);
   const [trucks, setTrucks] = useState<ScenarioTruck[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [parseSummary, setParseSummary] = useState<ParseSummary | null>(null);
   const [recommendationGroups, setRecommendationGroups] = useState<RecommendationGroup[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "loaded" | "matching" | "matched">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -475,10 +545,21 @@ export default function ScenarioLabPage() {
     };
   }, [loads, trucks]);
 
+  function resetScenario() {
+    setLoads([]);
+    setTrucks([]);
+    setValidationWarnings([]);
+    setParseSummary(null);
+    setRecommendationGroups([]);
+    setStatus("idle");
+    setError(null);
+  }
+
   async function loadSampleScenario() {
     setStatus("loading");
     setError(null);
     setValidationWarnings([]);
+    setParseSummary(null);
     setRecommendationGroups([]);
 
     try {
@@ -505,10 +586,20 @@ export default function ScenarioLabPage() {
         ...loadResults.warnings,
         ...truckResults.warnings,
       ];
+      const nextParseSummary = {
+        loadRowsRead: parsedLoads.rows.length,
+        truckRowsRead: parsedTrucks.rows.length,
+        loadsLoaded: loadResults.loads.length,
+        trucksLoaded: truckResults.trucks.length,
+        loadsSkipped: Math.max(parsedLoads.rows.length - loadResults.loads.length, 0),
+        trucksSkipped: Math.max(parsedTrucks.rows.length - truckResults.trucks.length, 0),
+        warnings: warnings.length,
+      };
 
       setLoads(loadResults.loads);
       setTrucks(truckResults.trucks);
       setValidationWarnings(warnings);
+      setParseSummary(nextParseSummary);
 
       if (loadResults.loads.length === 0 || truckResults.trucks.length === 0) {
         setError("No valid sample scenario rows were available to match.");
@@ -571,19 +662,63 @@ export default function ScenarioLabPage() {
               Loads and trucks are fetched from public sample CSV files bundled with the app.
             </p>
           </div>
-          <button
-            className="w-fit rounded bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400"
-            disabled={status === "loading"}
-            onClick={loadSampleScenario}
-            type="button"
-          >
-            {status === "loading" ? "Loading sample scenario..." : "Load sample scenario"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <a
+              className="w-fit rounded border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50"
+              download="sample_loads_50.csv"
+              href={loadsPath}
+            >
+              Download sample loads CSV
+            </a>
+            <a
+              className="w-fit rounded border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50"
+              download="sample_trucks_5.csv"
+              href={trucksPath}
+            >
+              Download sample trucks CSV
+            </a>
+            <button
+              className="w-fit rounded border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+              disabled={status === "loading"}
+              onClick={resetScenario}
+              type="button"
+            >
+              Reset scenario
+            </button>
+            <button
+              className="w-fit rounded bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+              disabled={status === "loading"}
+              onClick={loadSampleScenario}
+              type="button"
+            >
+              {status === "loading" ? "Loading sample scenario..." : "Load sample scenario"}
+            </button>
+          </div>
         </div>
         {error && (
           <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
             {error}
           </p>
+        )}
+        {parseSummary && (
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-gray-500">Loads loaded</p>
+              <p className="font-bold">{parseSummary.loadsLoaded} of {parseSummary.loadRowsRead}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Trucks loaded</p>
+              <p className="font-bold">{parseSummary.trucksLoaded} of {parseSummary.truckRowsRead}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Skipped rows</p>
+              <p className="font-bold">{parseSummary.loadsSkipped + parseSummary.trucksSkipped}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Warnings</p>
+              <p className="font-bold">{parseSummary.warnings}</p>
+            </div>
+          </div>
         )}
         {validationWarnings.length > 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -715,7 +850,7 @@ export default function ScenarioLabPage() {
                 Local matching checks equipment, weight, empty miles, estimated cost, profit, priority, and score.
               </p>
               <p className="text-sm text-gray-600">
-                Local simulation — no Circle payment, Gemini call, Neon persistence, or dashboard record is created in this MVP.
+                Local simulation - no Circle payment, Gemini call, Neon persistence, or dashboard record is created in this MVP.
               </p>
             </div>
             <button
@@ -824,7 +959,7 @@ export default function ScenarioLabPage() {
                           Contact shipper
                         </button>
                         <p className="text-xs leading-5 text-gray-500">
-                          Simulated action — real shipper contact is not enabled in this MVP.
+                          Simulated action - real shipper contact is not enabled in this MVP.
                         </p>
                       </div>
                     </article>
