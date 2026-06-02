@@ -72,6 +72,11 @@ type RecommendationGroup = {
 
 type ScenarioSource = "sample" | "uploaded";
 
+type FlatRecommendation = {
+  truck: ScenarioTruck;
+  recommendation: Recommendation;
+};
+
 const loadsPath = "/sample-data/sample_loads_50.csv";
 const trucksPath = "/sample-data/sample_trucks_5.csv";
 const maxUploadBytes = 1024 * 1024;
@@ -265,19 +270,21 @@ function validateText(row: Record<string, string>, fields: string[]) {
 }
 
 function collectNumericIssues(row: Record<string, string>, fields: string[]) {
-  return fields.map((field) => {
-    const rawValue = row[field] ?? "";
-    const value = parseNumber(rawValue);
+  return fields
+    .map((field) => {
+      const rawValue = row[field] ?? "";
+      const value = parseNumber(rawValue);
 
-    return {
-      field,
-      value,
-      issue: rawValue.trim() ? null : `missing ${fieldLabel(field)}`,
-    };
-  }).map((result) => ({
-    ...result,
-    issue: result.issue ?? (result.value === null ? `invalid ${fieldLabel(result.field)}` : null),
-  }));
+      return {
+        field,
+        value,
+        issue: rawValue.trim() ? null : `missing ${fieldLabel(field)}`,
+      };
+    })
+    .map((result) => ({
+      ...result,
+      issue: result.issue ?? (result.value === null ? `invalid ${fieldLabel(result.field)}` : null),
+    }));
 }
 
 function startsWithSpreadsheetFormula(value: string) {
@@ -548,6 +555,10 @@ function degreesToRadians(value: number) {
   return (value * Math.PI) / 180;
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function haversineMiles(fromLat: number, fromLng: number, toLat: number, toLng: number) {
   const earthRadiusMiles = 3958.8;
   const latDelta = degreesToRadians(toLat - fromLat);
@@ -563,10 +574,6 @@ function haversineMiles(fromLat: number, fromLng: number, toLat: number, toLng: 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return earthRadiusMiles * c;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 function priorityScore(priority: string) {
@@ -637,6 +644,68 @@ function runMatching(loads: ScenarioLoad[], trucks: ScenarioTruck[]): Recommenda
   }));
 }
 
+function flattenRecommendations(groups: RecommendationGroup[]) {
+  return groups.flatMap((group) =>
+    group.recommendations.map((recommendation) => ({ truck: group.truck, recommendation })),
+  );
+}
+
+function dispatcherNote(recommendation: Recommendation) {
+  if (recommendation.emptyMiles > 200) return "Review due to high empty miles";
+  if (recommendation.score >= 82 && recommendation.emptyMiles <= 150) return "Strong match";
+  if (recommendation.score < 75 && recommendation.load.rate_usd >= 3000) return "Strategic / repositioning candidate";
+  return "Review manually";
+}
+
+function whyThisMatch(truck: ScenarioTruck, recommendation: Recommendation) {
+  const scoreQuality = recommendation.score >= 85 ? "High" : recommendation.score >= 75 ? "Solid" : "Moderate";
+  const proximity = recommendation.emptyMiles <= 100
+    ? "near the pickup origin"
+    : recommendation.emptyMiles <= 200
+      ? "within a workable empty-mile range"
+      : "requires a longer repositioning move";
+  const profitQuality = recommendation.estimatedProfit >= 1500 ? "strong profit" : "positive profit";
+
+  return `${scoreQuality} score because ${truck.equipment_type} equipment fits, the truck is ${proximity}, and the lane shows ${profitQuality} on ${formatCurrency(recommendation.load.rate_usd)} revenue.`;
+}
+
+function escapeCsvCell(value: string | number) {
+  const rawValue = String(value ?? "");
+  const formulaSafeValue = startsWithSpreadsheetFormula(rawValue) ? `'${rawValue}` : rawValue;
+  return `"${formulaSafeValue.replaceAll('"', '""')}"`;
+}
+
+function buildMatchingResultsCsv(items: FlatRecommendation[]) {
+  const header = [
+    "truck_id",
+    "load_id",
+    "origin",
+    "destination",
+    "equipment_type",
+    "score",
+    "empty_miles",
+    "revenue_usd",
+    "dispatcher_note",
+    "why_summary",
+  ];
+  const rows = items.map(({ truck, recommendation }) => [
+    truck.truck_id,
+    recommendation.load.load_id,
+    `${recommendation.load.origin_city}, ${recommendation.load.origin_state}`,
+    `${recommendation.load.destination_city}, ${recommendation.load.destination_state}`,
+    recommendation.load.equipment_type,
+    recommendation.score,
+    Math.round(recommendation.emptyMiles),
+    recommendation.load.rate_usd,
+    dispatcherNote(recommendation),
+    whyThisMatch(truck, recommendation),
+  ]);
+
+  return [header, ...rows]
+    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
+    .join("\n");
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -678,6 +747,7 @@ export default function ScenarioLabPage() {
   const [uploadedTrucksFile, setUploadedTrucksFile] = useState<File | null>(null);
   const [uploadInputKey, setUploadInputKey] = useState(0);
   const [activeSource, setActiveSource] = useState<ScenarioSource | null>(null);
+  const [isDispatcherHelpOpen, setIsDispatcherHelpOpen] = useState(false);
 
   const summary = useMemo(() => {
     const equipmentTypes = Array.from(
@@ -690,6 +760,30 @@ export default function ScenarioLabPage() {
       totalRevenue,
     };
   }, [loads, trucks]);
+
+  const flatRecommendations = useMemo(
+    () => flattenRecommendations(recommendationGroups),
+    [recommendationGroups],
+  );
+
+  const matchingMetrics = useMemo(() => {
+    const totalRecommendations = flatRecommendations.length;
+    const matchedTrucks = recommendationGroups.filter((group) => group.recommendations.length > 0).length;
+    const totalScore = flatRecommendations.reduce((sum, item) => sum + item.recommendation.score, 0);
+    const potentialMatchedRevenue = flatRecommendations.reduce(
+      (sum, item) => sum + item.recommendation.load.rate_usd,
+      0,
+    );
+    const totalEmptyMiles = flatRecommendations.reduce((sum, item) => sum + item.recommendation.emptyMiles, 0);
+
+    return {
+      matchedTrucks,
+      totalRecommendations,
+      averageScore: totalRecommendations > 0 ? Math.round(totalScore / totalRecommendations) : 0,
+      potentialMatchedRevenue,
+      averageEmptyMiles: totalRecommendations > 0 ? totalEmptyMiles / totalRecommendations : 0,
+    };
+  }, [flatRecommendations, recommendationGroups]);
 
   function resetScenario() {
     setLoads([]);
@@ -736,6 +830,7 @@ export default function ScenarioLabPage() {
     setTrucks(truckResults.trucks);
     setValidationWarnings(warnings);
     setParseSummary(nextParseSummary);
+    setRecommendationGroups([]);
     setActiveSource(source);
 
     if (loadResults.loads.length === 0 || truckResults.trucks.length === 0) {
@@ -822,6 +917,20 @@ export default function ScenarioLabPage() {
     setStatus("matched");
   }
 
+  function exportMatchingResults() {
+    if (flatRecommendations.length === 0) return;
+
+    const csv = buildMatchingResultsCsv(flatRecommendations);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "scenario_lab_matching_results.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="space-y-7 p-4 sm:p-6 lg:p-8">
       <header className="flex flex-col gap-4 border-b border-gray-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
@@ -836,8 +945,43 @@ export default function ScenarioLabPage() {
             </span>
           </div>
           <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
-            Load a sample logistics scenario to see how AI-assisted matching can pair trucks with available loads. Contact actions are simulated.
+            Test truck-to-load matching with sample or uploaded CSV data.
           </p>
+          <section className="max-w-3xl rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <button
+              className="flex w-full items-center justify-between gap-3 text-left"
+              onClick={() => setIsDispatcherHelpOpen((isOpen) => !isOpen)}
+              type="button"
+            >
+              <span>
+                <span className="block text-sm font-bold text-gray-900">How does this help dispatchers?</span>
+                <span className="block text-sm leading-6 text-gray-600">See which truck fits which load - and why.</span>
+              </span>
+              <span className="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600">
+                {isDispatcherHelpOpen ? "Hide" : "Show"}
+              </span>
+            </button>
+            {isDispatcherHelpOpen && (
+              <div className="mt-4 grid gap-3 text-sm leading-6 text-gray-700 md:grid-cols-2">
+                <div>
+                  <p className="font-semibold text-gray-900">What this page does</p>
+                  <p>Scenario Lab lets you test how Arc AI Logistics matches available trucks with open loads.</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">How to test it</p>
+                  <p>Use sample CSVs or upload your own loads and trucks CSVs. The page compares location, origin, equipment, empty miles, revenue, and score.</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">What it proves</p>
+                  <p>It supports dispatchers before connecting to real GPS, ELD, TMS, or load-board APIs.</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Important</p>
+                  <p>This is a manual simulation of an operational feed, not live GPS integration. Uploaded CSVs stay local in the browser and are not saved to Neon, sent to Gemini, or connected to Circle payments.</p>
+                </div>
+              </div>
+            )}
+          </section>
           <p className="max-w-3xl rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-800">
             Scenario Lab is a local sandbox for testing CSV-based truck/load matching. In v0.0.5.a, matching runs in the browser and does not create a paid agent run.
           </p>
@@ -1135,15 +1279,49 @@ export default function ScenarioLabPage() {
 
       {recommendationGroups.length > 0 && (
         <section className="space-y-4">
-          <div className="space-y-2">
-            <h2 className="font-bold">Matching Results</h2>
-            <p className="text-sm text-gray-600">
-              Recommendations are grouped by truck and limited to 0-3 positive-profit matches per truck.
-            </p>
-            <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-800">
-              These recommendations are generated by local matching logic in the browser. They are not yet persisted to Neon, do not call Gemini, and do not appear in the Agent Economics Dashboard.
-            </p>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-2">
+              <h2 className="font-bold">Matching Results</h2>
+              <p className="text-sm text-gray-600">
+                Recommendations are grouped by truck and limited to 0-3 positive-profit matches per truck.
+              </p>
+            </div>
+            <button
+              className="w-fit rounded border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+              disabled={flatRecommendations.length === 0}
+              onClick={exportMatchingResults}
+              type="button"
+            >
+              Export matching results as CSV
+            </button>
           </div>
+
+          <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-800">
+            These recommendations are generated by local matching logic in the browser. They are not yet persisted to Neon, do not call Gemini, and do not appear in the Agent Economics Dashboard.
+          </p>
+
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-gray-500">Matched trucks</p>
+              <p className="mt-2 text-2xl font-bold">{matchingMetrics.matchedTrucks}</p>
+            </div>
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-gray-500">Total recommendations</p>
+              <p className="mt-2 text-2xl font-bold">{matchingMetrics.totalRecommendations}</p>
+            </div>
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-gray-500">Average score</p>
+              <p className="mt-2 text-2xl font-bold">{matchingMetrics.averageScore}</p>
+            </div>
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-gray-500">Potential matched revenue</p>
+              <p className="mt-2 text-2xl font-bold">{formatCurrency(matchingMetrics.potentialMatchedRevenue)}</p>
+            </div>
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-gray-500">Average empty miles</p>
+              <p className="mt-2 text-2xl font-bold">{formatMiles(matchingMetrics.averageEmptyMiles)}</p>
+            </div>
+          </section>
 
           {recommendationGroups.map((group) => (
             <div className="space-y-4 rounded-xl border p-4" key={group.truck.truck_id}>
@@ -1186,7 +1364,7 @@ export default function ScenarioLabPage() {
 
                       <div className="space-y-1 text-sm">
                         <p className="font-semibold">
-                          {recommendation.load.origin_city}, {recommendation.load.origin_state} &rarr; {recommendation.load.destination_city}, {recommendation.load.destination_state}
+                          {recommendation.load.origin_city}, {recommendation.load.origin_state} -&gt; {recommendation.load.destination_city}, {recommendation.load.destination_state}
                         </p>
                         <p className="text-gray-600">{recommendation.load.commodity} for {recommendation.load.shipper_name}</p>
                       </div>
@@ -1198,6 +1376,16 @@ export default function ScenarioLabPage() {
                         <p>Estimated cost: <span className="font-semibold">{formatCurrency(recommendation.estimatedCost)}</span></p>
                         <p>Estimated profit: <span className="font-semibold">{formatCurrency(recommendation.estimatedProfit)}</span></p>
                         <p>Priority: <span className="font-semibold">{recommendation.load.priority}</span></p>
+                      </div>
+
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+                        <p className="font-semibold">Dispatcher note</p>
+                        <p className="mt-1 text-gray-700">{dispatcherNote(recommendation)}</p>
+                      </div>
+
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+                        <p className="font-semibold">Why this match?</p>
+                        <p className="mt-1 text-gray-700">{whyThisMatch(group.truck, recommendation)}</p>
                       </div>
 
                       <div className="space-y-2 text-sm">
