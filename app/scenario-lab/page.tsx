@@ -1,5 +1,6 @@
 "use client";
 
+import type { ChangeEvent } from "react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -44,6 +45,7 @@ type ParsedCsv = {
 };
 
 type ParseSummary = {
+  sourceLabel: string;
   loadRowsRead: number;
   truckRowsRead: number;
   loadsLoaded: number;
@@ -68,8 +70,21 @@ type RecommendationGroup = {
   recommendations: Recommendation[];
 };
 
+type ScenarioSource = "sample" | "uploaded";
+
 const loadsPath = "/sample-data/sample_loads_50.csv";
 const trucksPath = "/sample-data/sample_trucks_5.csv";
+const maxUploadBytes = 1024 * 1024;
+const maxUploadedRows = 500;
+const maxCsvRowLength = 10000;
+
+const allowedCsvMimeTypes = new Set([
+  "",
+  "text/csv",
+  "application/csv",
+  "text/plain",
+  "application/vnd.ms-excel",
+]);
 
 const expectedLoadHeaders = [
   "load_id",
@@ -103,6 +118,26 @@ const expectedTruckHeaders = [
   "max_weight_lbs",
   "cost_per_mile",
   "driver_hours_available",
+  "home_base",
+];
+
+const loadFormulaProtectedFields = [
+  "load_id",
+  "origin_city",
+  "origin_state",
+  "destination_city",
+  "destination_state",
+  "equipment_type",
+  "commodity",
+  "priority",
+  "shipper_name",
+];
+
+const truckFormulaProtectedFields = [
+  "truck_id",
+  "current_city",
+  "current_state",
+  "equipment_type",
   "home_base",
 ];
 
@@ -183,7 +218,7 @@ function parseCsv(text: string, fileLabel: string, expectedHeaders: string[]): P
     return {
       rows: [],
       warnings: [
-        `${fileLabel}: header row does not match the expected Scenario Lab schema.`,
+        `${fileLabel}: header row does not match the expected Scenario Lab schema. Please start from the sample CSV.`,
         `${fileLabel}: expected ${expectedHeaderLine}`,
       ],
     };
@@ -243,7 +278,17 @@ function collectNumericIssues(row: Record<string, string>, fields: string[]) {
   }));
 }
 
-function validateLoad(row: Record<string, string>, rowNumber: number) {
+function startsWithSpreadsheetFormula(value: string) {
+  return /^[=+\-@]/.test(value.trim());
+}
+
+function collectFormulaIssues(row: Record<string, string>, fields: string[]) {
+  return fields
+    .filter((field) => startsWithSpreadsheetFormula(row[field] ?? ""))
+    .map((field) => `${fieldLabel(field)} starts with a spreadsheet formula character`);
+}
+
+function validateLoad(row: Record<string, string>, rowNumber: number, fileLabel: string, protectFormulaText = false) {
   const issues = validateText(row, [
     "load_id",
     "origin_city",
@@ -255,6 +300,11 @@ function validateLoad(row: Record<string, string>, rowNumber: number) {
     "priority",
     "shipper_name",
   ]);
+
+  if (protectFormulaText) {
+    issues.push(...collectFormulaIssues(row, loadFormulaProtectedFields));
+  }
+
   const numericFields = [
     "origin_lat",
     "origin_lng",
@@ -288,7 +338,7 @@ function validateLoad(row: Record<string, string>, rowNumber: number) {
   if (issues.length > 0) {
     return {
       load: null,
-      warning: `Row ${rowNumber} skipped in sample_loads_50.csv: ${issues.join("; ")}.`,
+      warning: `Row ${rowNumber} skipped in ${fileLabel}: ${issues.join("; ")}.`,
     };
   }
 
@@ -317,7 +367,7 @@ function validateLoad(row: Record<string, string>, rowNumber: number) {
   };
 }
 
-function validateTruck(row: Record<string, string>, rowNumber: number) {
+function validateTruck(row: Record<string, string>, rowNumber: number, fileLabel: string, protectFormulaText = false) {
   const issues = validateText(row, [
     "truck_id",
     "current_city",
@@ -326,6 +376,11 @@ function validateTruck(row: Record<string, string>, rowNumber: number) {
     "equipment_type",
     "home_base",
   ]);
+
+  if (protectFormulaText) {
+    issues.push(...collectFormulaIssues(row, truckFormulaProtectedFields));
+  }
+
   const numericFields = [
     "current_lat",
     "current_lng",
@@ -354,7 +409,7 @@ function validateTruck(row: Record<string, string>, rowNumber: number) {
   if (issues.length > 0) {
     return {
       truck: null,
-      warning: `Row ${rowNumber} skipped in sample_trucks_5.csv: ${issues.join("; ")}.`,
+      warning: `Row ${rowNumber} skipped in ${fileLabel}: ${issues.join("; ")}.`,
     };
   }
 
@@ -376,12 +431,12 @@ function validateTruck(row: Record<string, string>, rowNumber: number) {
   };
 }
 
-function mapValidatedLoads(rows: Record<string, string>[]) {
+function mapValidatedLoads(rows: Record<string, string>[], fileLabel: string, protectFormulaText = false) {
   const warnings: string[] = [];
   const loads: ScenarioLoad[] = [];
 
   rows.forEach((row, index) => {
-    const result = validateLoad(row, index + 2);
+    const result = validateLoad(row, index + 2, fileLabel, protectFormulaText);
     if (result.load) loads.push(result.load);
     if (result.warning) warnings.push(result.warning);
   });
@@ -389,17 +444,78 @@ function mapValidatedLoads(rows: Record<string, string>[]) {
   return { loads, warnings };
 }
 
-function mapValidatedTrucks(rows: Record<string, string>[]) {
+function mapValidatedTrucks(rows: Record<string, string>[], fileLabel: string, protectFormulaText = false) {
   const warnings: string[] = [];
   const trucks: ScenarioTruck[] = [];
 
   rows.forEach((row, index) => {
-    const result = validateTruck(row, index + 2);
+    const result = validateTruck(row, index + 2, fileLabel, protectFormulaText);
     if (result.truck) trucks.push(result.truck);
     if (result.warning) warnings.push(result.warning);
   });
 
   return { trucks, warnings };
+}
+
+function validateUploadedFileMetadata(file: File) {
+  const hasCsvExtension = file.name.toLowerCase().endsWith(".csv");
+
+  if (!hasCsvExtension) {
+    return "Only plain CSV files are supported. Please upload a .csv file exported from a spreadsheet editor.";
+  }
+
+  if (file.size > maxUploadBytes) {
+    return "CSV files must be 1 MB or smaller for this browser-side demo.";
+  }
+
+  if (!allowedCsvMimeTypes.has(file.type)) {
+    return "Only plain CSV files are supported. Please upload a .csv file exported from a spreadsheet editor.";
+  }
+
+  return null;
+}
+
+function validateUploadedCsvText(text: string, fileLabel: string, expectedHeaders: string[]) {
+  if (text.includes("\0")) {
+    return `${fileLabel}: this file appears to contain binary data. Please upload a plain .csv file.`;
+  }
+
+  const trimmedText = text.trimStart();
+  const lowerText = trimmedText.toLowerCase();
+
+  if (lowerText.startsWith("<!doctype html") || lowerText.startsWith("<html") || lowerText.includes("<script")) {
+    return `${fileLabel}: this file looks like HTML, not CSV. Please upload a plain .csv file.`;
+  }
+
+  const [rawHeaderLine, ...rawRows] = text.trim().split(/\r?\n/);
+  const headerLine = rawHeaderLine?.replace(/^\uFEFF/, "") ?? "";
+
+  if (headerLine.trim() !== expectedHeaders.join(",")) {
+    return `${fileLabel}: header row does not match the expected Scenario Lab schema. Please start from the sample CSV.`;
+  }
+
+  const dataRows = rawRows.filter((row) => row.trim().length > 0);
+
+  if (dataRows.length > maxUploadedRows) {
+    return `${fileLabel}: too many rows. This MVP supports up to ${maxUploadedRows} data rows per uploaded CSV.`;
+  }
+
+  if (dataRows.some((row) => row.length > maxCsvRowLength)) {
+    return `${fileLabel}: one or more rows are unusually long. Please upload a plain CSV with normal row lengths.`;
+  }
+
+  return null;
+}
+
+async function readUploadedCsv(file: File, fileLabel: string, expectedHeaders: string[]) {
+  const metadataError = validateUploadedFileMetadata(file);
+  if (metadataError) throw new Error(metadataError);
+
+  const text = await file.text();
+  const contentError = validateUploadedCsvText(text, fileLabel, expectedHeaders);
+  if (contentError) throw new Error(contentError);
+
+  return text;
 }
 
 function degreesToRadians(value: number) {
@@ -532,6 +648,10 @@ export default function ScenarioLabPage() {
   const [recommendationGroups, setRecommendationGroups] = useState<RecommendationGroup[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "loaded" | "matching" | "matched">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [uploadedLoadsFile, setUploadedLoadsFile] = useState<File | null>(null);
+  const [uploadedTrucksFile, setUploadedTrucksFile] = useState<File | null>(null);
+  const [uploadInputKey, setUploadInputKey] = useState(0);
+  const [activeSource, setActiveSource] = useState<ScenarioSource | null>(null);
 
   const summary = useMemo(() => {
     const equipmentTypes = Array.from(
@@ -553,6 +673,52 @@ export default function ScenarioLabPage() {
     setRecommendationGroups([]);
     setStatus("idle");
     setError(null);
+    setUploadedLoadsFile(null);
+    setUploadedTrucksFile(null);
+    setUploadInputKey((key) => key + 1);
+    setActiveSource(null);
+  }
+
+  function applyParsedScenario(
+    parsedLoads: ParsedCsv,
+    parsedTrucks: ParsedCsv,
+    source: ScenarioSource,
+    loadFileLabel: string,
+    truckFileLabel: string,
+    protectFormulaText = false,
+  ) {
+    const loadResults = mapValidatedLoads(parsedLoads.rows, loadFileLabel, protectFormulaText);
+    const truckResults = mapValidatedTrucks(parsedTrucks.rows, truckFileLabel, protectFormulaText);
+    const warnings = [
+      ...parsedLoads.warnings,
+      ...parsedTrucks.warnings,
+      ...loadResults.warnings,
+      ...truckResults.warnings,
+    ];
+    const nextParseSummary = {
+      sourceLabel: source === "sample" ? "Sample CSV data" : "Uploaded CSV data",
+      loadRowsRead: parsedLoads.rows.length,
+      truckRowsRead: parsedTrucks.rows.length,
+      loadsLoaded: loadResults.loads.length,
+      trucksLoaded: truckResults.trucks.length,
+      loadsSkipped: Math.max(parsedLoads.rows.length - loadResults.loads.length, 0),
+      trucksSkipped: Math.max(parsedTrucks.rows.length - truckResults.trucks.length, 0),
+      warnings: warnings.length,
+    };
+
+    setLoads(loadResults.loads);
+    setTrucks(truckResults.trucks);
+    setValidationWarnings(warnings);
+    setParseSummary(nextParseSummary);
+    setActiveSource(source);
+
+    if (loadResults.loads.length === 0 || truckResults.trucks.length === 0) {
+      setError("No valid scenario rows were available to match.");
+      setStatus("idle");
+      return;
+    }
+
+    setStatus("loaded");
   }
 
   async function loadSampleScenario() {
@@ -578,40 +744,49 @@ export default function ScenarioLabPage() {
       ]);
       const parsedLoads = parseCsv(loadsText, "sample_loads_50.csv", expectedLoadHeaders);
       const parsedTrucks = parseCsv(trucksText, "sample_trucks_5.csv", expectedTruckHeaders);
-      const loadResults = mapValidatedLoads(parsedLoads.rows);
-      const truckResults = mapValidatedTrucks(parsedTrucks.rows);
-      const warnings = [
-        ...parsedLoads.warnings,
-        ...parsedTrucks.warnings,
-        ...loadResults.warnings,
-        ...truckResults.warnings,
-      ];
-      const nextParseSummary = {
-        loadRowsRead: parsedLoads.rows.length,
-        truckRowsRead: parsedTrucks.rows.length,
-        loadsLoaded: loadResults.loads.length,
-        trucksLoaded: truckResults.trucks.length,
-        loadsSkipped: Math.max(parsedLoads.rows.length - loadResults.loads.length, 0),
-        trucksSkipped: Math.max(parsedTrucks.rows.length - truckResults.trucks.length, 0),
-        warnings: warnings.length,
-      };
 
-      setLoads(loadResults.loads);
-      setTrucks(truckResults.trucks);
-      setValidationWarnings(warnings);
-      setParseSummary(nextParseSummary);
-
-      if (loadResults.loads.length === 0 || truckResults.trucks.length === 0) {
-        setError("No valid sample scenario rows were available to match.");
-        setStatus("idle");
-        return;
-      }
-
-      setStatus("loaded");
+      applyParsedScenario(parsedLoads, parsedTrucks, "sample", "sample_loads_50.csv", "sample_trucks_5.csv");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load sample scenario.");
       setStatus("idle");
     }
+  }
+
+  async function loadUploadedScenario() {
+    if (!uploadedLoadsFile || !uploadedTrucksFile) {
+      setError("Please choose one loads CSV and one trucks CSV before loading uploaded data.");
+      return;
+    }
+
+    setStatus("loading");
+    setError(null);
+    setValidationWarnings([]);
+    setParseSummary(null);
+    setRecommendationGroups([]);
+
+    try {
+      const [loadsText, trucksText] = await Promise.all([
+        readUploadedCsv(uploadedLoadsFile, "uploaded loads CSV", expectedLoadHeaders),
+        readUploadedCsv(uploadedTrucksFile, "uploaded trucks CSV", expectedTruckHeaders),
+      ]);
+      const parsedLoads = parseCsv(loadsText, "uploaded loads CSV", expectedLoadHeaders);
+      const parsedTrucks = parseCsv(trucksText, "uploaded trucks CSV", expectedTruckHeaders);
+
+      applyParsedScenario(parsedLoads, parsedTrucks, "uploaded", "uploaded loads CSV", "uploaded trucks CSV", true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to load uploaded CSV files.");
+      setStatus("idle");
+    }
+  }
+
+  function handleLoadsUpload(event: ChangeEvent<HTMLInputElement>) {
+    setUploadedLoadsFile(event.target.files?.[0] ?? null);
+    setError(null);
+  }
+
+  function handleTrucksUpload(event: ChangeEvent<HTMLInputElement>) {
+    setUploadedTrucksFile(event.target.files?.[0] ?? null);
+    setError(null);
   }
 
   function runScenarioMatching() {
@@ -655,7 +830,26 @@ export default function ScenarioLabPage() {
       </header>
 
       <section className="space-y-4 rounded-xl border p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <h2 className="font-bold">Prepare CSV files</h2>
+          <p className="text-sm leading-6 text-gray-700">
+            Start by downloading the sample loads CSV and sample trucks CSV. Edit copies in Google Sheets, Excel, or LibreOffice, then export or save them as plain CSV files.
+          </p>
+          <ul className="list-disc space-y-1 pl-5 text-sm leading-6 text-gray-700">
+            <li>Do not change column names or remove required columns.</li>
+            <li>Use one CSV for loads and one CSV for trucks.</li>
+            <li>Dates must use YYYY-MM-DD.</li>
+            <li>Coordinates, miles, weight, rates, cost per mile, and driver hours must be numbers.</li>
+            <li>Only plain .csv files are supported. Do not upload .xlsx, .xls, PDF, ZIP, HTML, images, or any other file type.</li>
+          </ul>
+          <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-800">
+            Uploaded CSV files are parsed locally in the browser. They are not sent to the server, not saved to Neon, do not create Circle payments, do not call Gemini, and do not create dashboard records.
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-xl border p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="font-bold">Sample Scenario</h2>
             <p className="text-sm text-gray-600">
@@ -695,13 +889,57 @@ export default function ScenarioLabPage() {
             </button>
           </div>
         </div>
+
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_auto]">
+          <label className="space-y-2 text-sm font-semibold">
+            <span>Upload loads CSV</span>
+            <input
+              key={`loads-${uploadInputKey}`}
+              accept=".csv,text/csv"
+              className="block w-full text-sm font-normal text-gray-700 file:mr-3 file:rounded file:border file:border-gray-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold"
+              onChange={handleLoadsUpload}
+              type="file"
+            />
+            <span className="block font-normal text-gray-600">
+              {uploadedLoadsFile ? uploadedLoadsFile.name : "No loads CSV selected"}
+            </span>
+          </label>
+          <label className="space-y-2 text-sm font-semibold">
+            <span>Upload trucks CSV</span>
+            <input
+              key={`trucks-${uploadInputKey}`}
+              accept=".csv,text/csv"
+              className="block w-full text-sm font-normal text-gray-700 file:mr-3 file:rounded file:border file:border-gray-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold"
+              onChange={handleTrucksUpload}
+              type="file"
+            />
+            <span className="block font-normal text-gray-600">
+              {uploadedTrucksFile ? uploadedTrucksFile.name : "No trucks CSV selected"}
+            </span>
+          </label>
+          <div className="flex items-end">
+            <button
+              className="w-fit rounded bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+              disabled={status === "loading" || !uploadedLoadsFile || !uploadedTrucksFile}
+              onClick={loadUploadedScenario}
+              type="button"
+            >
+              Load uploaded CSVs
+            </button>
+          </div>
+        </div>
+
         {error && (
           <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
             {error}
           </p>
         )}
         {parseSummary && (
-          <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <p className="text-gray-500">Data source</p>
+              <p className="font-bold">{parseSummary.sourceLabel}</p>
+            </div>
             <div>
               <p className="text-gray-500">Loads loaded</p>
               <p className="font-bold">{parseSummary.loadsLoaded} of {parseSummary.loadRowsRead}</p>
@@ -767,7 +1005,9 @@ export default function ScenarioLabPage() {
             <div className="space-y-3 rounded-xl border p-4">
               <div>
                 <h2 className="font-bold">Loads preview</h2>
-                <p className="text-sm text-gray-600">First 10 rows from sample_loads_50.csv.</p>
+                <p className="text-sm text-gray-600">
+                  {activeSource === "uploaded" ? "First 10 rows from uploaded loads CSV." : "First 10 rows from sample_loads_50.csv."}
+                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1040px] text-left text-xs">
@@ -808,7 +1048,9 @@ export default function ScenarioLabPage() {
             <div className="space-y-3 rounded-xl border p-4">
               <div>
                 <h2 className="font-bold">Trucks preview</h2>
-                <p className="text-sm text-gray-600">All 5 rows from sample_trucks_5.csv.</p>
+                <p className="text-sm text-gray-600">
+                  {activeSource === "uploaded" ? "Rows from uploaded trucks CSV." : "All 5 rows from sample_trucks_5.csv."}
+                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[820px] text-left text-xs">
