@@ -2,12 +2,19 @@
 
 ## v0.0.5.b - 2026-06-01
 
-Release consistency and grant page polish for Scenario Lab visibility.
+Release consistency, Scenario Lab dispatcher UX polish, and public demo access.
 
+- Added homepage access to Scenario Lab as an experimental local simulation.
+- Added Scenario Lab dispatcher UX improvements.
+- Added matching metrics for Scenario Lab results.
+- Added deterministic Why this match explanations.
+- Added dispatcher notes for recommendations.
+- Added browser-only CSV export for matching results.
+- Added dispatcher explainer guide.
 - Updated /grant Current Release block to v0.0.5.b.
-- Clarified Scenario Lab status as hidden experimental local simulation.
+- Clarified Scenario Lab status as experimental local simulation.
 - Added release consistency note across public release surfaces.
-- No changes to Circle payment flow, Gemini integration, database schema, migrations, dashboard logic, or Scenario Lab matching logic.
+- No changes to Circle payment flow, Gemini integration, database schema, migrations, dashboard logic, analytics persistence, or Scenario Lab matching logic.
 
 ## v0.0.5.a - 2026-06-01
 
