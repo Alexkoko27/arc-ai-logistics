@@ -464,6 +464,14 @@ export default function Home() {
             >
               Circle grant pitch
             </Link>
+            <a
+              className="inline-flex items-center rounded border border-gray-300 px-2.5 py-1 text-sm font-semibold leading-none text-gray-800 hover:bg-gray-50"
+              href="https://x.com/AlexandrB27"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Message founder
+            </a>
           </div>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
