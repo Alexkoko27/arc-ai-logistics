@@ -434,6 +434,12 @@ export default function Home() {
             </Link>
             <Link
               className="inline-flex items-center text-sm font-semibold leading-none underline underline-offset-4"
+              href="/scenario-lab"
+            >
+              Scenario Lab
+            </Link>
+            <Link
+              className="inline-flex items-center text-sm font-semibold leading-none underline underline-offset-4"
               href="/grant"
             >
               Circle grant pitch
@@ -446,6 +452,27 @@ export default function Home() {
           demo charges {demoData?.agentFee.amount ?? "0.005"} USDC on Arc Testnet
           and returns an on-chain proof.
         </p>
+        <section className="rounded-xl border border-lime-200 bg-lime-50/70 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-bold">Scenario Lab</h2>
+                <span className="rounded-full border border-lime-300 bg-white/70 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-lime-800">
+                  Experimental / Local Simulation
+                </span>
+              </div>
+              <p className="max-w-3xl text-sm leading-6 text-gray-700">
+                Test truck-to-load matching with sample or uploaded CSV data. This is a safe demo sandbox, not a live dispatch platform or real GPS integration.
+              </p>
+            </div>
+            <Link
+              className="inline-flex w-fit rounded border border-lime-700 px-4 py-2 text-sm font-semibold text-lime-900 hover:bg-lime-100"
+              href="/scenario-lab"
+            >
+              Open Scenario Lab
+            </Link>
+          </div>
+        </section>
       </header>
 
       {isChangelogOpen && (
