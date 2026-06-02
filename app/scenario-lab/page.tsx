@@ -77,6 +77,8 @@ const trucksPath = "/sample-data/sample_trucks_5.csv";
 const maxUploadBytes = 1024 * 1024;
 const maxUploadedRows = 500;
 const maxCsvRowLength = 10000;
+const supportedEquipmentTypes = new Set(["dry van", "reefer", "flatbed"]);
+const supportedEquipmentLabel = "Dry Van, Reefer, or Flatbed";
 
 const allowedCsvMimeTypes = new Set([
   "",
@@ -288,6 +290,16 @@ function collectFormulaIssues(row: Record<string, string>, fields: string[]) {
     .map((field) => `${fieldLabel(field)} starts with a spreadsheet formula character`);
 }
 
+function isSupportedEquipmentType(value: string) {
+  return supportedEquipmentTypes.has(value.trim().toLowerCase());
+}
+
+function collectCoordinateRangeIssues(numbers: Record<string, number | null>, fields: string[], min: number, max: number) {
+  return fields
+    .filter((field) => numbers[field] !== null && (numbers[field] < min || numbers[field] > max))
+    .map((field) => `${fieldLabel(field)} must be between ${min} and ${max}`);
+}
+
 function validateLoad(row: Record<string, string>, rowNumber: number, fileLabel: string, protectFormulaText = false) {
   const issues = validateText(row, [
     "load_id",
@@ -303,6 +315,10 @@ function validateLoad(row: Record<string, string>, rowNumber: number, fileLabel:
 
   if (protectFormulaText) {
     issues.push(...collectFormulaIssues(row, loadFormulaProtectedFields));
+  }
+
+  if (row.equipment_type?.trim() && !isSupportedEquipmentType(row.equipment_type)) {
+    issues.push(`equipment type is not supported. Use ${supportedEquipmentLabel}`);
   }
 
   const numericFields = [
@@ -322,6 +338,9 @@ function validateLoad(row: Record<string, string>, rowNumber: number, fileLabel:
   numericResults.forEach((result) => {
     if (result.issue) issues.push(result.issue);
   });
+
+  issues.push(...collectCoordinateRangeIssues(numbers, ["origin_lat", "destination_lat"], -90, 90));
+  issues.push(...collectCoordinateRangeIssues(numbers, ["origin_lng", "destination_lng"], -180, 180));
 
   ["miles", "weight_lbs", "rate_usd"].forEach((field) => {
     if (numbers[field] !== null && numbers[field] <= 0) {
@@ -381,6 +400,10 @@ function validateTruck(row: Record<string, string>, rowNumber: number, fileLabel
     issues.push(...collectFormulaIssues(row, truckFormulaProtectedFields));
   }
 
+  if (row.equipment_type?.trim() && !isSupportedEquipmentType(row.equipment_type)) {
+    issues.push(`equipment type is not supported. Use ${supportedEquipmentLabel}`);
+  }
+
   const numericFields = [
     "current_lat",
     "current_lng",
@@ -396,6 +419,9 @@ function validateTruck(row: Record<string, string>, rowNumber: number, fileLabel
   numericResults.forEach((result) => {
     if (result.issue) issues.push(result.issue);
   });
+
+  issues.push(...collectCoordinateRangeIssues(numbers, ["current_lat"], -90, 90));
+  issues.push(...collectCoordinateRangeIssues(numbers, ["current_lng"], -180, 180));
 
   ["max_weight_lbs", "cost_per_mile", "driver_hours_available"].forEach((field) => {
     if (numbers[field] !== null && numbers[field] <= 0) {
