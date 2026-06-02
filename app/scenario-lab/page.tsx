@@ -947,7 +947,10 @@ export default function ScenarioLabPage() {
           <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
             Test truck-to-load matching with sample or uploaded CSV data.
           </p>
-          <section className="max-w-3xl rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <section className="mx-auto max-w-4xl rounded-xl border border-lime-200 bg-lime-50/70 p-4 shadow-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-lime-800">
+              Dispatcher guide
+            </p>
             <button
               className="flex w-full items-center justify-between gap-3 text-left"
               onClick={() => setIsDispatcherHelpOpen((isOpen) => !isOpen)}
@@ -955,9 +958,9 @@ export default function ScenarioLabPage() {
             >
               <span>
                 <span className="block text-sm font-bold text-gray-900">How does this help dispatchers?</span>
-                <span className="block text-sm leading-6 text-gray-600">See which truck fits which load - and why.</span>
+                <span className="block text-sm leading-6 text-gray-600">See which truck fits which load — and why.</span>
               </span>
-              <span className="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600">
+              <span className="rounded border border-lime-300 bg-white/70 px-2 py-1 text-xs font-semibold text-lime-800">
                 {isDispatcherHelpOpen ? "Hide" : "Show"}
               </span>
             </button>
@@ -973,7 +976,7 @@ export default function ScenarioLabPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">What it proves</p>
-                  <p>It supports dispatchers before connecting to real GPS, ELD, TMS, or load-board APIs.</p>
+                  <p>It shows how the app can support dispatchers before connecting to real GPS, ELD, TMS, or load-board APIs.</p>
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">Important</p>
