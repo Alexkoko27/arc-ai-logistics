@@ -33,6 +33,7 @@ The demo combines truck location, load data, routing, economics, weather risk, h
 - Arc settlement proof
 - Explorer verification
 - Agent Payment Ledger
+- Weather Agent ledger allocation
 - Agent Economics Dashboard
 - Analytics API
 - Per-agent revenue tracking
@@ -115,7 +116,7 @@ Arc provides stablecoin-native infrastructure suited for programmable settlement
 
 Circle Developer Controlled Wallets power the current server-side payment flow. A paid agent run creates a real Circle transaction, settles USDC on Arc, returns Circle transaction status, and displays explorer proof when available.
 
-The agent ledger breaks one 0.005 USDC paid analysis into visible work units, preparing the system for future machine-to-machine payment flows without hiding agent execution costs inside the backend.
+The agent ledger breaks one 0.005 USDC paid analysis into visible work units, preparing the system for future machine-to-machine payment flows without hiding agent execution costs inside the backend. Weather Agent is now represented as its own visible operational signal and ledger allocation while Risk Agent remains the aggregate risk synthesis.
 
 ## Agent Payment Ledger
 
@@ -124,7 +125,8 @@ The agent ledger breaks one 0.005 USDC paid analysis into visible work units, pr
 | GPS Agent | 0.001 USDC |
 | Route Agent | 0.0015 USDC |
 | Economics Agent | 0.0015 USDC |
-| Risk Agent | 0.001 USDC |
+| Risk Agent | 0.0005 USDC |
+| Weather Agent | 0.0005 USDC |
 | Total | 0.005 USDC |
 
 This matters because it makes AI-agent execution economically visible and prepares the system for machine-to-machine payment flows. Instead of treating AI analysis as a hidden backend cost, the demo shows how each agent task can become a priced, auditable work unit.
@@ -138,6 +140,7 @@ The dashboard shows:
 - Average Cost per Analysis
 - Total Analyses
 - Per-agent revenue
+- Weather Agent analytics visibility
 - Payment status filters for All, Cleared, Pending, and Failed records
 - Paginated payment history through the existing analytics data source
 - CSV export for payment records matching an optional date range
@@ -149,10 +152,17 @@ Analytics persistence is backed by Neon/Postgres with a Drizzle-managed schema a
 
 ## Current Release
 
-v0.0.5.b - 2026-06-01
+v0.0.5.c - 2026-06-03
 
 Release highlights:
 
+- Added Weather Agent ledger allocation visibility
+- Added Weather Agent analytics visibility across paid agent economics surfaces
+- Updated public release/documentation surfaces for Weather Agent operational role
+- Aligned visible release references to v0.0.5.c
+- Kept total paid analysis bundle at exactly 0.005 USDC
+- Kept Risk Agent as aggregate risk synthesis
+- No changes to runtime logic, Circle payment flow, database schema, migrations, analytics logic, dashboard functionality, or Scenario Lab behavior
 - Added homepage access to Scenario Lab as an experimental local simulation
 - Added Scenario Lab dispatcher UX improvements
 - Added Scenario Lab matching metrics
@@ -160,10 +170,7 @@ Release highlights:
 - Added dispatcher notes for recommendations
 - Added browser-only CSV export for Scenario Lab matching results
 - Added dispatcher explainer guide
-- Updated `/grant` Current Release block to v0.0.5.b
 - Clarified Scenario Lab status as experimental local simulation
-- Added release consistency note across public release surfaces
-- No changes to Circle payment flow, Gemini integration, database schema, migrations, dashboard logic, or Scenario Lab matching logic
 - Sample CSV-based local truck/load matching simulation
 - Browser-side CSV upload for Scenario Lab data
 - 50-load and 5-truck sample dataset
@@ -203,6 +210,7 @@ Release highlights:
 - Scenario Lab browser CSV upload: COMPLETE
 - Scenario Lab CSV result export: COMPLETE
 - Agent Payment Ledger: COMPLETE
+- Weather Agent ledger allocation: COMPLETE
 - Circle DCW payment flow: COMPLETE
 - Real USDC settlement on Arc: COMPLETE
 - Explorer proof display: COMPLETE
@@ -220,6 +228,7 @@ Release highlights:
 
 - Google Routes is used for server-side routing when configured, with safe fallback miles when unavailable.
 - OpenWeather is used server-side through `OPENWEATHER_API_KEY`; the key is never exposed to the browser.
+- Weather Agent represents OpenWeather/fallback weather intelligence as a visible operational signal and separate paid ledger allocation.
 - The app runs safely without `OPENWEATHER_API_KEY` by using fallback weather risk.
 - Gemini is used for AI dispatch recommendations when configured, with local fallback recommendation logic when unavailable.
 - Scenario Lab uses bundled sample CSV files, user-uploaded CSV files, and local browser-side matching only; it is not connected to Circle payments, Gemini, Neon persistence, or dashboard observability yet.
@@ -301,4 +310,4 @@ Never commit `.env.local`, API keys, entity secrets, wallet secrets, database UR
 
 ## Grant Reviewer Note
 
-Arc AI Logistics is a live demo and grant-ready prototype showing AI logistics analysis, USDC-denominated paid agent execution, real Circle DCW payments, Arc settlement proof, payment analytics, and an experimental Scenario Lab sandbox for browser-side CSV logistics matching. The next step is to move from preset demo data and local CSV simulation toward durable production data, stronger history storage, and more autonomous dispatch workflows.
+Arc AI Logistics is a live demo and grant-ready prototype showing AI logistics analysis, USDC-denominated paid agent execution, real Circle DCW payments, Arc settlement proof, payment analytics, Weather Agent ledger allocation visibility, and an experimental Scenario Lab sandbox for browser-side CSV logistics matching. The next step is to move from preset demo data and local CSV simulation toward durable production data, stronger history storage, and more autonomous dispatch workflows.
