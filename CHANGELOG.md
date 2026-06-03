@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.0.5.c - 2026-06-03
+
+Weather Agent ledger allocation and release surface alignment.
+
+- Added Weather Agent ledger allocation visibility.
+- Added Weather Agent analytics visibility across paid agent economics surfaces.
+- Updated release/documentation surfaces for Weather Agent operational role.
+- Aligned public release references to v0.0.5.c.
+- No changes to runtime logic, Circle payment flow, database schema, migrations, analytics logic, dashboard functionality, or Scenario Lab behavior.
+
 ## v0.0.5.b - 2026-06-01
 
 Release consistency, Scenario Lab dispatcher UX polish, and public demo access.
