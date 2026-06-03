@@ -311,3 +311,34 @@ Never commit `.env.local`, API keys, entity secrets, wallet secrets, database UR
 ## Grant Reviewer Note
 
 Arc AI Logistics is a live demo and grant-ready prototype showing AI logistics analysis, USDC-denominated paid agent execution, real Circle DCW payments, Arc settlement proof, payment analytics, Weather Agent ledger allocation visibility, and an experimental Scenario Lab sandbox for browser-side CSV logistics matching. The next step is to move from preset demo data and local CSV simulation toward durable production data, stronger history storage, and more autonomous dispatch workflows.
+
+## Circle Product Feedback
+
+### Why these products were chosen
+
+Arc AI Logistics was designed around programmable stablecoin-native operational workflows, where AI agents can coordinate logistics analysis, recommendation generation, and settlement visibility using onchain infrastructure.
+
+Circle Developer Controlled Wallets were chosen because they provided a practical way to demonstrate real AI-agent payment orchestration without requiring direct end-user wallet management.
+
+USDC was selected as the operational settlement asset because predictable denomination and stable value are important for logistics-oriented workflows and per-agent economic accounting.
+
+Arc was chosen because the network is specifically positioned around programmable stablecoin infrastructure and real-time operational coordination.
+
+### What worked well during development
+
+* Circle Developer Controlled Wallet onboarding and API structure were relatively straightforward for MVP integration.
+* Arc settlement confirmation flows were easy to demonstrate operationally in a live demo environment.
+* Stablecoin-denominated agent economics made it easier to model transparent per-agent operational costs.
+* Circle documentation and example flows made early experimentation significantly easier for a solo builder environment.
+
+### What could be improved
+
+* More end-to-end examples focused specifically on AI-agent orchestration workflows would be valuable.
+* Operational observability around payment lifecycle debugging could be expanded further.
+* More examples covering production-style multi-agent economic coordination patterns would help developers move from demo systems toward operational deployments.
+
+### Recommendations
+
+* More reference architectures for agentic commerce systems would help builders entering the ecosystem.
+* Additional examples around micropayment coordination, autonomous workflows, and AI-agent payment and settlement loops could significantly improve developer onboarding.
+* More logistics and operational workflow examples could help demonstrate stablecoin infrastructure outside traditional fintech use cases.
