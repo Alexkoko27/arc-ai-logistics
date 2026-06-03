@@ -7,8 +7,9 @@ import type { AgentPaymentResult, PaymentStatus } from "@/lib/payments/types";
 const agentRevenueModel: AgentRevenueMetric[] = [
   { agent: "GPS Agent", amountPerRun: 0.001, totalRevenue: 0 },
   { agent: "Route Agent", amountPerRun: 0.0015, totalRevenue: 0 },
-  { agent: "Risk Agent", amountPerRun: 0.001, totalRevenue: 0 },
   { agent: "Economics Agent", amountPerRun: 0.0015, totalRevenue: 0 },
+  { agent: "Risk Agent", amountPerRun: 0.0005, totalRevenue: 0 },
+  { agent: "Weather Agent", amountPerRun: 0.0005, totalRevenue: 0 },
 ];
 
 const analyticsStorePath = join(
