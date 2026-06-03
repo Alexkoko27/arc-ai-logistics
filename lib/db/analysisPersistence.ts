@@ -16,8 +16,10 @@ const agentSlugByRunName = new Map([
   ["Fleet GPS Agent", "gps-agent"],
   ["GPS Agent", "gps-agent"],
   ["Route Agent", "route-agent"],
-  ["Risk Agent", "risk-agent"],
   ["Economics Agent", "economics-agent"],
+  ["Risk Agent", "risk-agent"],
+  ["Weather Agent", "weather-agent"],
+  ["OpenWeather Risk Agent", "weather-agent"],
 ]);
 
 function safeAmount(amount: string | number) {
@@ -123,7 +125,12 @@ export async function createStoredAnalysisRun(run: AgentRunResult) {
         defaultPriceUsdc: agent.defaultPriceUsdc,
       },
       outputSummary: runAgent.summary,
-      score: runAgent.name === "Risk Agent" ? String(run.risk.score) : null,
+      score:
+        runAgent.name === "Risk Agent"
+          ? String(run.risk.score)
+          : runAgent.name === "Weather Agent"
+            ? String(run.weatherRisk.riskScoreDelta)
+            : null,
       costUsdc: agent.defaultPriceUsdc,
       startedAt: new Date(),
       completedAt: new Date(),
