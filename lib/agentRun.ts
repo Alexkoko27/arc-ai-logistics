@@ -525,9 +525,23 @@ export async function runPaidAgentAnalysis(
       },
     },
     {
+      name: "Weather Agent",
+      status: weatherRisk.riskLevel === "high" ? "warning" : "complete",
+      summary: `${weatherRisk.riskLevel.toUpperCase()} weather risk using ${weatherRisk.source === "openweather" ? "live OpenWeather" : "fallback"} data.`,
+      details: {
+        weatherRiskLevel: weatherRisk.riskLevel,
+        weatherSource: weatherRisk.source,
+        riskScoreDelta: weatherRisk.riskScoreDelta,
+        weatherWeight: weatherRisk.weatherWeight,
+        checkedAt: weatherRisk.checkedAt,
+        summary: weatherRisk.summary,
+        reasons: weatherRisk.reasons.join(" "),
+      },
+    },
+    {
       name: "Risk Agent",
       status: risk.level === "high" ? "warning" : "complete",
-      summary: `${risk.level.toUpperCase()} risk score: ${risk.score}/100 with ${weatherRisk.source === "openweather" ? "live" : "fallback"} weather risk.`,
+      summary: `${risk.level.toUpperCase()} aggregate risk score: ${risk.score}/100 including weather, historical lane, appointment, and economics factors.`,
       details: {
         riskScore: risk.score,
         riskLevel: risk.level,
