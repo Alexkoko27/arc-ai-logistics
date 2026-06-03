@@ -10,7 +10,7 @@ const milestones = [
   {
     title: "Milestone 2 - Agent Payment Ledger",
     status: "COMPLETE",
-    body: "Added a USDC-denominated ledger for the agent run. The UI now shows per-agent execution costs for GPS, Route, Economics, and Risk agents, plus the total agent run cost of 0.005 USDC.",
+    body: "Added a USDC-denominated ledger for the agent run. The UI now shows per-agent execution costs for GPS, Route, Economics, Risk, and Weather agents, plus the total agent run cost of 0.005 USDC.",
   },
   {
     title: "Milestone 3 - Grant-Ready Public Pitch",
@@ -35,7 +35,7 @@ const milestones = [
   {
     title: "Milestone 7 - Agent Economics Dashboard",
     status: "COMPLETE",
-    body: "Added a dedicated analytics dashboard showing Total Payments, Total USDC Spent, Average Cost per Analysis, Total Analyses, Per-Agent Revenue, payment lifecycle filters, full payment history visibility, CSV export, Transaction IDs, Transaction Hashes, and Arc Explorer Proof Links. Analytics records are persisted through Neon/Postgres with the legacy JSON store retained as fallback.",
+    body: "Added a dedicated analytics dashboard showing Total Payments, Total USDC Spent, Average Cost per Analysis, Total Analyses, Per-Agent Revenue, Weather Agent visibility, payment lifecycle filters, full payment history visibility, CSV export, Transaction IDs, Transaction Hashes, and Arc Explorer Proof Links. Analytics records are persisted through Neon/Postgres with the legacy JSON store retained as fallback.",
   },
   {
     title: "Milestone 8 - Real Freight Data Integration",
@@ -52,6 +52,7 @@ const demoItems = [
   "Recommendation",
   "Paid Agent Run",
   "Agent Payment Ledger",
+  "Weather Agent",
   "Arc Explorer proof",
   "Multi-shipment optimization",
   "Agent Economics Dashboard",
@@ -68,6 +69,7 @@ const implementedItems = [
   "Arc Settlement Proof",
   "Multi-Shipment Optimization",
   "Agent Economics Dashboard",
+  "Weather Agent Ledger",
   "Payment Status Filters",
   "CSV Export",
   "Analytics Persistence",
@@ -139,6 +141,7 @@ export default function GrantPage() {
                 "Shipment Agent",
                 "Route Agent",
                 "Economics Agent",
+                "Weather Agent",
                 "Risk Agent",
                 "Payment Agent",
               ].map((agent) => (
@@ -170,8 +173,10 @@ export default function GrantPage() {
             />
           </div>
           <p className="mt-3 text-sm leading-6 text-gray-600">
-            GPS, shipment, route, economics, risk and payment agents coordinate
-            logistics decisions and settle paid agent runs through Circle + Arc.
+            GPS, shipment, route, economics, weather, risk and payment agents
+            coordinate logistics decisions and settle paid agent runs through
+            Circle + Arc. Weather intelligence is visible as its own operational
+            signal while aggregate risk remains handled by the Risk Agent.
           </p>
         </section>
 
@@ -224,14 +229,14 @@ export default function GrantPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Current Release
               </p>
-              <h2 className="text-2xl font-bold">v0.0.5.b</h2>
+              <h2 className="text-2xl font-bold">v0.0.5.c</h2>
               <p className="max-w-2xl text-sm leading-6 text-gray-700">
                 The current release keeps public release surfaces aligned and
-                exposes Scenario Lab as an experimental local simulation for CSV-based
-                dispatcher testing. It still includes real payment proof,
+                reflects Weather Agent as a visible operational signal and paid
+                ledger allocation. It still includes real payment proof,
                 multi-shipment optimization, database-backed analytics, payment
-                status filtering, full payment history visibility, and CSV export
-                for visible records.
+                status filtering, full payment history visibility, Scenario Lab
+                CSV simulation, and CSV export for visible records.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:min-w-[28rem]">
