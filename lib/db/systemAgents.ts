@@ -1,4 +1,4 @@
-import { isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { getDb, hasDatabaseUrl } from "./client";
 import { agents } from "./schema";
 
@@ -63,18 +63,36 @@ export async function seedDefaultSystemAgentsWithDb({
   const missingAgents = defaultSystemAgents.filter(
     (agent) => !existingSlugs.has(agent.slug),
   );
+  let inserted = 0;
 
-  if (missingAgents.length === 0) return { inserted: 0 };
+  if (missingAgents.length > 0) {
+    await db.insert(agents).values(
+      missingAgents.map((agent) => ({
+        ...agent,
+        ownerUserId: null,
+        isActive: true,
+      })),
+    );
+    inserted = missingAgents.length;
+  }
 
-  await db.insert(agents).values(
-    missingAgents.map((agent) => ({
-      ...agent,
-      ownerUserId: null,
-      isActive: true,
-    })),
-  );
+  for (const agent of defaultSystemAgents) {
+    if (!existingSlugs.has(agent.slug)) continue;
 
-  return { inserted: missingAgents.length };
+    await db
+      .update(agents)
+      .set({
+        name: agent.name,
+        category: agent.category,
+        description: agent.description,
+        defaultPriceUsdc: agent.defaultPriceUsdc,
+        isActive: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(agents.slug, agent.slug));
+  }
+
+  return { inserted };
 }
 
 export async function getDefaultSystemAgentMap() {
