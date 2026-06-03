@@ -1,4 +1,4 @@
-import { count, isNull } from "drizzle-orm";
+import { isNull } from "drizzle-orm";
 import { getDb, hasDatabaseUrl } from "./client";
 import { agents } from "./schema";
 
@@ -18,18 +18,25 @@ export const defaultSystemAgents = [
     defaultPriceUsdc: "0.0015",
   },
   {
-    slug: "risk-agent",
-    name: "Risk Agent",
-    category: "system",
-    description: "Weather, historical lane, appointment, and aggregate risk.",
-    defaultPriceUsdc: "0.001",
-  },
-  {
     slug: "economics-agent",
     name: "Economics Agent",
     category: "system",
     description: "Revenue, cost, margin, RPM, and true net profit analysis.",
     defaultPriceUsdc: "0.0015",
+  },
+  {
+    slug: "risk-agent",
+    name: "Risk Agent",
+    category: "system",
+    description: "Historical lane, appointment, and aggregate risk synthesis.",
+    defaultPriceUsdc: "0.0005",
+  },
+  {
+    slug: "weather-agent",
+    name: "Weather Agent",
+    category: "system",
+    description: "OpenWeather and fallback weather risk evaluation.",
+    defaultPriceUsdc: "0.0005",
   },
 ] as const;
 
@@ -51,19 +58,23 @@ export async function seedDefaultSystemAgentsWithDb({
   }
 
   const db = getDatabase();
-  const [agentCount] = await db.select({ value: count() }).from(agents);
+  const existingAgents = await db.select({ slug: agents.slug }).from(agents);
+  const existingSlugs = new Set(existingAgents.map((agent) => agent.slug));
+  const missingAgents = defaultSystemAgents.filter(
+    (agent) => !existingSlugs.has(agent.slug),
+  );
 
-  if ((agentCount?.value ?? 0) > 0) return { inserted: 0 };
+  if (missingAgents.length === 0) return { inserted: 0 };
 
   await db.insert(agents).values(
-    defaultSystemAgents.map((agent) => ({
+    missingAgents.map((agent) => ({
       ...agent,
       ownerUserId: null,
       isActive: true,
     })),
   );
 
-  return { inserted: defaultSystemAgents.length };
+  return { inserted: missingAgents.length };
 }
 
 export async function getDefaultSystemAgentMap() {
