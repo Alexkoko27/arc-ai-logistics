@@ -213,7 +213,8 @@ const agentPaymentLedger = [
   { agent: "GPS Agent", amount: "0.001 USDC" },
   { agent: "Route Agent", amount: "0.0015 USDC" },
   { agent: "Economics Agent", amount: "0.0015 USDC" },
-  { agent: "Risk Agent", amount: "0.001 USDC" },
+  { agent: "Risk Agent", amount: "0.0005 USDC" },
+  { agent: "Weather Agent", amount: "0.0005 USDC" },
 ];
 
 const totalAgentPayment = "0.005 USDC";
