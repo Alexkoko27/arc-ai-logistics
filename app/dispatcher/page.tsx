@@ -365,6 +365,12 @@ export default async function DispatcherCockpitPage() {
         </div>
       </header>
 
+      <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+        Stage 1D-A mutation foundation is prepared, but create/edit/reserve/release
+        controls remain disabled. This cockpit stays read-only until the focused
+        Stage 1D-B, 1D-C, and 1D-D operation flows are implemented.
+      </section>
+
       {!data.isConfigured ? (
         <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           Dispatcher cockpit data is not configured in this runtime. Set the dev
