@@ -73,6 +73,23 @@ These principles define the long-term direction of Arc AI Logistics: an AI-agent
 
 AI Agent System: GPS, shipment, route, economics, risk, weather, historical lane, and payment agents coordinate freight decisions and prepare paid agent runs through Circle + Arc infrastructure.
 
+## MVP To Production Transition Plan
+
+The current public release (v0.0.5.c) represents the completed MVP phase of Arc AI Logistics.
+
+The next stage focuses on transitioning from a demonstration-oriented AI-agent coordination system toward a more dispatcher-grade operational platform with:
+
+- richer load details,
+- broker/payment reliability analysis,
+- post-booking workflow orchestration,
+- enhanced profitability modeling,
+- real-world operational data integrations,
+- and deeper stablecoin-native settlement visibility.
+
+The diagram below summarizes the current MVP architecture and the planned production-oriented evolution path.
+
+![MVP To Production Architecture](public/images/mvp-to-production-architecture.jpg)
+
 ## Current Demo Flow
 
 Truck
@@ -120,14 +137,14 @@ The agent ledger breaks one 0.005 USDC paid analysis into visible work units, pr
 
 ## Agent Payment Ledger
 
-| Agent | Cost |
-| --- | ---: |
-| GPS Agent | 0.001 USDC |
-| Route Agent | 0.0015 USDC |
+| Agent           |        Cost |
+| --------------- | ----------: |
+| GPS Agent       |  0.001 USDC |
+| Route Agent     | 0.0015 USDC |
 | Economics Agent | 0.0015 USDC |
-| Risk Agent | 0.0005 USDC |
-| Weather Agent | 0.0005 USDC |
-| Total | 0.005 USDC |
+| Risk Agent      | 0.0005 USDC |
+| Weather Agent   | 0.0005 USDC |
+| Total           |  0.005 USDC |
 
 This matters because it makes AI-agent execution economically visible and prepares the system for machine-to-machine payment flows. Instead of treating AI analysis as a hidden backend cost, the demo shows how each agent task can become a priced, auditable work unit.
 
@@ -326,19 +343,19 @@ Arc was chosen because the network is specifically positioned around programmabl
 
 ### What worked well during development
 
-* Circle Developer Controlled Wallet onboarding and API structure were relatively straightforward for MVP integration.
-* Arc settlement confirmation flows were easy to demonstrate operationally in a live demo environment.
-* Stablecoin-denominated agent economics made it easier to model transparent per-agent operational costs.
-* Circle documentation and example flows made early experimentation significantly easier for a solo builder environment.
+- Circle Developer Controlled Wallet onboarding and API structure were relatively straightforward for MVP integration.
+- Arc settlement confirmation flows were easy to demonstrate operationally in a live demo environment.
+- Stablecoin-denominated agent economics made it easier to model transparent per-agent operational costs.
+- Circle documentation and example flows made early experimentation significantly easier for a solo builder environment.
 
 ### What could be improved
 
-* More end-to-end examples focused specifically on AI-agent orchestration workflows would be valuable.
-* Operational observability around payment lifecycle debugging could be expanded further.
-* More examples covering production-style multi-agent economic coordination patterns would help developers move from demo systems toward operational deployments.
+- More end-to-end examples focused specifically on AI-agent orchestration workflows would be valuable.
+- Operational observability around payment lifecycle debugging could be expanded further.
+- More examples covering production-style multi-agent economic coordination patterns would help developers move from demo systems toward operational deployments.
 
 ### Recommendations
 
-* More reference architectures for agentic commerce systems would help builders entering the ecosystem.
-* Additional examples around micropayment coordination, autonomous workflows, and AI-agent payment and settlement loops could significantly improve developer onboarding.
-* More logistics and operational workflow examples could help demonstrate stablecoin infrastructure outside traditional fintech use cases.
+- More reference architectures for agentic commerce systems would help builders entering the ecosystem.
+- Additional examples around micropayment coordination, autonomous workflows, and AI-agent payment and settlement loops could significantly improve developer onboarding.
+- More logistics and operational workflow examples could help demonstrate stablecoin infrastructure outside traditional fintech use cases.
