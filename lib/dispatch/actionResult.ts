@@ -2,6 +2,10 @@ export type DispatcherMutationErrorCode =
   | "VALIDATION_ERROR"
   | "DISPATCHER_MUTATION_BLOCKED"
   | "STAGE_1D_A_FOUNDATION_ONLY"
+  | "LOAD_NOT_FOUND"
+  | "LOAD_NOT_EDITABLE_STATUS"
+  | "LOAD_NOT_EDITABLE_WHILE_RESERVED"
+  | "LOAD_NO_CHANGES"
   | "UNKNOWN_ERROR";
 
 export type DispatcherMutationActionResult = {

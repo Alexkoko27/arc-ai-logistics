@@ -1,4 +1,7 @@
 import Link from "next/link";
+import LoadMutationPanel, {
+  type LoadMutationPanelLoad,
+} from "@/components/dispatcher/LoadMutationPanel";
 import {
   type DispatcherLoadView,
   type DispatcherSuggestionView,
@@ -17,6 +20,10 @@ function formatDate(value: Date | null) {
     hour: "numeric",
     minute: "2-digit",
   }).format(value);
+}
+
+function formatDateInput(value: Date | null) {
+  return value ? value.toISOString().slice(0, 16) : "";
 }
 
 function formatCurrency(amount: string | null, currency = "USD") {
@@ -334,6 +341,31 @@ function SuggestionCard({
 export default async function DispatcherCockpitPage() {
   const data = await getDispatcherCockpitData();
   const latestRun = data.latestMatchingRun;
+  const editableLoads: LoadMutationPanelLoad[] = data.loads
+    .filter((load) => load.status === "available" && !load.activeReservation)
+    .map((load) => {
+      const pickup = load.stops.find((stop) => stop.stopType === "pickup");
+      const dropoff = load.stops.find((stop) => stop.stopType === "dropoff");
+
+      return {
+        id: load.id,
+        label: load.referenceNumber ?? load.externalId ?? load.id,
+        referenceNumber: load.referenceNumber ?? "",
+        equipmentType: load.equipmentType ?? "",
+        cargoType: load.cargoType ?? "",
+        weightLbs: load.weightLbs ? load.weightLbs.toString() : "",
+        rateAmount: load.rateAmount ?? "",
+        distanceMiles: load.distanceMiles ?? "",
+        pickupStartsAt: formatDateInput(load.pickupStartsAt),
+        pickupEndsAt: formatDateInput(load.pickupEndsAt),
+        deliveryStartsAt: formatDateInput(load.deliveryStartsAt),
+        deliveryEndsAt: formatDateInput(load.deliveryEndsAt),
+        pickupCity: pickup?.location?.city ?? "",
+        pickupState: pickup?.location?.state ?? "",
+        dropoffCity: dropoff?.location?.city ?? "",
+        dropoffState: dropoff?.location?.state ?? "",
+      };
+    });
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -365,11 +397,12 @@ export default async function DispatcherCockpitPage() {
         </div>
       </header>
 
-      <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-        Stage 1D-A mutation foundation is prepared, but create/edit/reserve/release
-        controls remain disabled. This cockpit stays read-only until the focused
-        Stage 1D-B, 1D-C, and 1D-D operation flows are implemented.
-      </section>
+      {data.organization ? (
+        <LoadMutationPanel
+          organizationId={data.organization.id}
+          editableLoads={editableLoads}
+        />
+      ) : null}
 
       {!data.isConfigured ? (
         <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

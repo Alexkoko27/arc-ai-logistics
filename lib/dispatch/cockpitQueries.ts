@@ -45,10 +45,13 @@ export type DispatcherLoadView = {
   status: string;
   equipmentType: string | null;
   cargoType: string | null;
+  weightLbs: number | null;
   rateAmount: string | null;
   currency: string;
   distanceMiles: string | null;
   pickupStartsAt: Date | null;
+  pickupEndsAt: Date | null;
+  deliveryStartsAt: Date | null;
   deliveryEndsAt: Date | null;
   sourceName: string | null;
   stops: Array<LoadStopRow & { location: LocationRow | null }>;
@@ -336,10 +339,13 @@ async function getLoads(db: Db, organizationId: string) {
     status: load.status,
     equipmentType: load.equipmentType,
     cargoType: load.cargoType,
+    weightLbs: load.weightLbs,
     rateAmount: load.rateAmount,
     currency: load.currency,
     distanceMiles: load.distanceMiles,
     pickupStartsAt: load.pickupStartsAt,
+    pickupEndsAt: load.pickupEndsAt,
+    deliveryStartsAt: load.deliveryStartsAt,
     deliveryEndsAt: load.deliveryEndsAt,
     sourceName: source?.name ?? null,
     stops: (stopsByLoad.get(load.id) ?? []).sort(

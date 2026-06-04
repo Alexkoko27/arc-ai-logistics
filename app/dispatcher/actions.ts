@@ -1,12 +1,16 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   dispatcherActionFailure,
+  dispatcherActionSuccess,
   type DispatcherMutationActionResult,
 } from "@/lib/dispatch/actionResult";
 import {
-  describeLoadMutationBoundary,
+  DispatcherLoadDomainError,
+  createDispatcherLoad,
+  editDispatcherLoad,
 } from "@/lib/dispatch/loadService";
 import {
   DispatcherMutationBlockedError,
@@ -89,30 +93,59 @@ function guardedAction<TInput>({
   }
 }
 
+function loadMutationFailure(error: unknown): DispatcherMutationActionResult {
+  if (error instanceof DispatcherMutationBlockedError) {
+    return dispatcherActionFailure({
+      code: "DISPATCHER_MUTATION_BLOCKED",
+      message: error.message,
+    });
+  }
+
+  if (error instanceof z.ZodError) {
+    return validationFailure(error);
+  }
+
+  if (error instanceof DispatcherLoadDomainError) {
+    return dispatcherActionFailure({
+      code: error.code,
+      message: error.message,
+    });
+  }
+
+  return dispatcherActionFailure({
+    code: "UNKNOWN_ERROR",
+    message: "Dispatcher load mutation failed.",
+  });
+}
+
 export async function createDispatcherLoadAction(
   input: unknown,
 ): Promise<DispatcherMutationActionResult> {
-  return guardedAction({
-    context: "create dispatcher load",
-    input,
-    schema: dispatcherCreateLoadSchema,
-    describeBoundary: describeLoadMutationBoundary,
-    foundationMessage:
-      "Load creation is validated but not persisted in Stage 1D-A.",
-  });
+  try {
+    assertDispatcherMutationAllowed("create dispatcher load");
+    const parsedInput = dispatcherCreateLoadSchema.parse(input);
+    const result = await createDispatcherLoad(parsedInput);
+    revalidatePath("/dispatcher");
+
+    return dispatcherActionSuccess(`Load ${result.loadId} created.`);
+  } catch (error) {
+    return loadMutationFailure(error);
+  }
 }
 
 export async function editDispatcherLoadAction(
   input: unknown,
 ): Promise<DispatcherMutationActionResult> {
-  return guardedAction({
-    context: "edit dispatcher load",
-    input,
-    schema: dispatcherEditLoadSchema,
-    describeBoundary: describeLoadMutationBoundary,
-    foundationMessage:
-      "Load editing is validated but not persisted in Stage 1D-A.",
-  });
+  try {
+    assertDispatcherMutationAllowed("edit dispatcher load");
+    const parsedInput = dispatcherEditLoadSchema.parse(input);
+    const result = await editDispatcherLoad(parsedInput);
+    revalidatePath("/dispatcher");
+
+    return dispatcherActionSuccess(`Load ${result.loadId} updated.`);
+  } catch (error) {
+    return loadMutationFailure(error);
+  }
 }
 
 export async function createDispatcherVehicleAction(
