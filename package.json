@@ -10,7 +10,10 @@
     "create:circle-wallet": "tsx --env-file=.env.local scripts/create-circle-wallet.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed-default-agents.ts"
+    "db:seed": "tsx scripts/seed-default-agents.ts",
+    "db:seed:dispatcher": "tsx scripts/seed-dispatcher-mock-data.ts",
+    "dispatch:match": "tsx scripts/run-matching.ts",
+    "dispatch:verify-reservation-lock": "tsx scripts/verify-reservation-lock.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
