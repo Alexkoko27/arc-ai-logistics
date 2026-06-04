@@ -1,5 +1,6 @@
 import { eq, isNull } from "drizzle-orm";
 import { getDb, hasDatabaseUrl } from "./client";
+import { getSelectedDatabaseUrlEnvName } from "./config";
 import { agents } from "./schema";
 
 export const defaultSystemAgents = [
@@ -54,7 +55,9 @@ export async function seedDefaultSystemAgentsWithDb({
   hasDatabaseUrl: typeof hasDatabaseUrl;
 }) {
   if (!hasUrl()) {
-    throw new Error("DATABASE_URL is required to seed default agents.");
+    throw new Error(
+      `${getSelectedDatabaseUrlEnvName()} is required to seed default agents.`,
+    );
   }
 
   const db = getDatabase();

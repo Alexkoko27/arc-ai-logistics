@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Pool } from "@neondatabase/serverless";
+import { getDatabaseUrl } from "../lib/db/config";
 
 const migrationFile = join(
   process.cwd(),
@@ -9,12 +10,7 @@ const migrationFile = join(
 );
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL;
-
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required to run migrations.");
-  }
-
+  const databaseUrl = getDatabaseUrl("database migrations");
   const pool = new Pool({ connectionString: databaseUrl });
   const migrationSql = readFileSync(migrationFile, "utf8");
   const statements = migrationSql

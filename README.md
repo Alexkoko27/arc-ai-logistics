@@ -321,7 +321,11 @@ OPENWEATHER_API_KEY=
 CIRCLE_API_KEY=
 CIRCLE_ENTITY_SECRET=
 DATABASE_URL=
+DEV_DATABASE_URL=
 ```
+
+Local development and production use `DATABASE_URL`. Vercel Preview deployments
+use `DEV_DATABASE_URL` when `VERCEL_ENV=preview`.
 
 Never commit `.env.local`, API keys, entity secrets, wallet secrets, database URLs, or private keys.
 
