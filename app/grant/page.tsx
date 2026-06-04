@@ -250,6 +250,27 @@ export default function GrantPage() {
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-4 space-y-2">
+            <h2 className="text-2xl font-bold">MVP To Production Transition Plan</h2>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-2">
+            <Image
+              className="h-auto w-full rounded-lg border border-gray-100 bg-white"
+              src="/images/mvp-to-production-architecture.jpg"
+              alt="MVP to production architecture transition plan"
+              width={1536}
+              height={1024}
+            />
+          </div>
+          <p className="mt-3 text-sm leading-6 text-gray-600">
+            The current public MVP is preserved while the next stage explores a
+            more dispatcher-grade operational architecture with richer load data,
+            broker reliability, post-booking workflow, and deeper settlement
+            visibility.
+          </p>
+        </section>
+
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
