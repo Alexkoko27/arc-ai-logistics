@@ -374,9 +374,9 @@ export const loadReservations = pgTable(
     loadId: uuid("load_id").notNull().references(() => loads.id),
     vehicleId: uuid("vehicle_id").references(() => vehicles.id),
     driverId: uuid("driver_id").references(() => drivers.id),
-    loadSuggestionId: uuid("load_suggestion_id").references(
-      () => loadSuggestions.id,
-    ),
+    loadSuggestionId: uuid("load_suggestion_id")
+      .notNull()
+      .references(() => loadSuggestions.id),
     reservedByUserId: uuid("reserved_by_user_id").references(() => users.id),
     status: text("status").notNull().default("active"),
     reservedAt: timestamp("reserved_at", { withTimezone: true })
