@@ -24,6 +24,7 @@ type ReserveLoadInput = {
 };
 
 type ReleaseReservationInput = {
+  organizationId: string;
   reservationId: string;
   releaseReason?: "released" | "expired" | "cancelled";
 };
@@ -264,6 +265,7 @@ async function releaseLoadReservationWithDb(
       .where(
         and(
           eq(loadReservations.id, input.reservationId),
+          eq(loadReservations.organizationId, input.organizationId),
           eq(loadReservations.status, "active"),
         ),
       )
@@ -271,7 +273,7 @@ async function releaseLoadReservationWithDb(
   )[0];
 
   if (!reservation) {
-    throw new Error(`Active reservation ${input.reservationId} was not found.`);
+    throw new Error(`Active reservation ${input.reservationId} was not found for this organization.`);
   }
 
   const remainingActiveReservation = (
@@ -296,6 +298,7 @@ async function releaseLoadReservationWithDb(
         and(
           eq(loads.id, reservation.loadId),
           eq(loads.organizationId, reservation.organizationId),
+          eq(loads.status, "reserved"),
         ),
       );
   }
