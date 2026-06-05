@@ -202,7 +202,7 @@ export async function reserveDispatcherLoadAction(
     revalidatePath("/dispatcher");
 
     return dispatcherActionSuccess(
-      `Temporary reservation ${reservation.id} created for load ${reservation.loadId}.`,
+      `Temporary reservation ${reservation.id} is active for load ${reservation.loadId}.`,
     );
   } catch (error) {
     return reservationMutationFailure(error);
@@ -219,7 +219,7 @@ export async function releaseDispatcherReservationAction(
     revalidatePath("/dispatcher");
 
     return dispatcherActionSuccess(
-      `Temporary reservation ${reservation.id} released for load ${reservation.loadId}.`,
+      `Temporary reservation ${reservation.id} is ${reservation.status} for load ${reservation.loadId}.`,
     );
   } catch (error) {
     return reservationMutationFailure(error);
