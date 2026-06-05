@@ -11,6 +11,7 @@ import {
   vehicles,
 } from "../db/schema";
 import { assertDevDispatcherDatabaseTarget } from "./devDatabaseGuard";
+import { expireDispatcherReservations } from "./reservationService";
 
 const modelProvider = "arc-deterministic";
 const modelName = "stage-1b-mock-matcher";
@@ -270,6 +271,7 @@ async function loadAvailableLoads(db: MutationDb, organizationId: string) {
           where ${loadReservations.organizationId} = ${organizationId}
             and ${loadReservations.loadId} = ${loads.id}
             and ${loadReservations.status} = 'active'
+            and ${loadReservations.expiresAt} > now()
         )`,
       ),
     );
@@ -311,6 +313,8 @@ export async function runMatchingEngine({
   db?: Db;
 }): Promise<MatchingRunResult> {
   assertDevDispatcherDatabaseTarget("run dispatcher matching");
+
+  await expireDispatcherReservations({ db, organizationId });
 
   return db.transaction(async (tx) => {
     const vehicleContexts = await loadVehicleContexts(tx, organizationId);
