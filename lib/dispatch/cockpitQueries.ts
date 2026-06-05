@@ -15,10 +15,7 @@ import {
   vehicles,
 } from "../db/schema";
 import { dispatcherMockData } from "./mockData";
-import {
-  expireDispatcherReservations,
-  type LoadSuggestionCurrentStop,
-} from "./reservationService";
+import type { LoadSuggestionCurrentStop } from "./reservationService";
 
 type Db = ReturnType<typeof getDb>;
 type JsonRecord = Record<string, unknown>;
@@ -546,7 +543,11 @@ async function getReservationSummary(
         summary.activeHolds += 1;
       }
 
-      if (reservation.status === "expired") {
+      if (
+        reservation.status === "expired" ||
+        (reservation.status === "active" &&
+          reservation.expiresAt.getTime() <= now.getTime())
+      ) {
         summary.expiredHolds += 1;
       }
 
@@ -561,6 +562,7 @@ async function getReservationActivityByStatus(
   organizationId: string,
   status: "active" | "released" | "expired",
 ) {
+  const now = new Date();
   const rows = await db
     .select({
       reservation: loadReservations,
@@ -586,10 +588,16 @@ async function getReservationActivityByStatus(
     .where(
       and(
         eq(loadReservations.organizationId, organizationId),
-        eq(loadReservations.status, status),
-        status === "active"
-          ? sql`${loadReservations.expiresAt} > now()`
-          : undefined,
+        status === "expired"
+          ? sql`(
+              ${loadReservations.status} = 'expired'
+              or (
+                ${loadReservations.status} = 'active'
+                and ${loadReservations.expiresAt} <= ${now}
+              )
+            )`
+          : eq(loadReservations.status, status),
+        status === "active" ? sql`${loadReservations.expiresAt} > ${now}` : undefined,
       ),
     )
     .orderBy(desc(loadReservations.updatedAt))
@@ -600,7 +608,11 @@ async function getReservationActivityByStatus(
     loadReference: loadReference(load, reservation.loadId),
     loadSuggestionId: reservation.loadSuggestionId,
     suggestionReference: suggestionReference(suggestion, reservation.loadSuggestionId),
-    status: reservation.status,
+    status:
+      reservation.status === "active" &&
+      reservation.expiresAt.getTime() <= now.getTime()
+        ? "expired"
+        : reservation.status,
     createdAt: reservation.createdAt,
     updatedAt: reservation.updatedAt,
     releasedAt: reservation.releasedAt,
@@ -649,8 +661,6 @@ export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData>
       reservationActivity: emptyReservationActivity,
     };
   }
-
-  await expireDispatcherReservations({ db, organizationId: organization.id });
 
   const [
     vehicleViews,
