@@ -36,6 +36,11 @@ type ExpireReservationsInput = {
   now?: Date;
 };
 
+const activeReservationConstraintNames = [
+  "load_reservations_active_load_idx",
+  "load_reservations_active_suggestion_idx",
+];
+
 export type DispatcherReservationDomainErrorCode =
   | "LOAD_SUGGESTION_NOT_RESERVABLE"
   | "RESERVATION_NOT_FOUND";
@@ -81,12 +86,15 @@ function isActiveReservationConflict(error: unknown) {
     const code = currentError.code;
     const constraint = currentError.constraint ?? currentError.constraint_name;
     const message = currentError.message;
+    const messageText = typeof message === "string" ? message : "";
 
     if (
-      code === "23505" ||
-      constraint === "load_reservations_active_load_idx" ||
-      (typeof message === "string" &&
-        message.includes("load_reservations_active_load_idx"))
+      code === "23505" &&
+      (typeof constraint !== "string" ||
+        activeReservationConstraintNames.includes(constraint) ||
+        activeReservationConstraintNames.some((name) =>
+          messageText.includes(name),
+        ))
     ) {
       return true;
     }
@@ -178,6 +186,26 @@ export async function expireDispatcherReservations({
   });
 }
 
+async function findActiveReservationForSuggestion(
+  db: MutationDb,
+  input: Pick<ReserveLoadInput, "organizationId" | "loadId" | "loadSuggestionId">,
+) {
+  return (
+    await db
+      .select()
+      .from(loadReservations)
+      .where(
+        and(
+          eq(loadReservations.organizationId, input.organizationId),
+          eq(loadReservations.loadId, input.loadId),
+          eq(loadReservations.loadSuggestionId, input.loadSuggestionId),
+          eq(loadReservations.status, "active"),
+        ),
+      )
+      .limit(1)
+  )[0];
+}
+
 async function assertVehicleBelongsToOrganization(
   db: MutationDb,
   organizationId: string,
@@ -221,27 +249,6 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
     loadId: input.loadId,
   });
 
-  const load = (
-    await db
-      .select()
-      .from(loads)
-      .where(
-        and(
-          eq(loads.id, input.loadId),
-          eq(loads.organizationId, input.organizationId),
-        ),
-      )
-      .limit(1)
-  )[0];
-
-  if (!load) {
-    throw new Error(`Load ${input.loadId} was not found for this organization.`);
-  }
-
-  if (load.status !== "available") {
-    throw new ActiveLoadReservationConflictError(input.loadId);
-  }
-
   if (!input.loadSuggestionId) {
     throw loadSuggestionNotReservable(
       "A reservable load suggestion is required to reserve a load.",
@@ -273,10 +280,34 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
     );
   }
 
+  const existingReservation = await findActiveReservationForSuggestion(db, input);
+  if (existingReservation) return existingReservation;
+
   if (suggestion.status !== "suggested") {
     throw loadSuggestionNotReservable(
       "Only suggested load suggestions can be reserved.",
     );
+  }
+
+  const load = (
+    await db
+      .select()
+      .from(loads)
+      .where(
+        and(
+          eq(loads.id, input.loadId),
+          eq(loads.organizationId, input.organizationId),
+        ),
+      )
+      .limit(1)
+  )[0];
+
+  if (!load) {
+    throw new Error(`Load ${input.loadId} was not found for this organization.`);
+  }
+
+  if (load.status !== "available") {
+    throw new ActiveLoadReservationConflictError(input.loadId);
   }
 
   if (input.vehicleId && input.vehicleId !== suggestion.vehicleId) {
@@ -307,7 +338,7 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
         reservedByUserId: input.reservedByUserId ?? null,
         status: "active",
         expiresAt: toDate(input.expiresAt) ?? new Date(Date.now() + 30 * 60 * 1000),
-        metadata: { stage: "1D-D-C" },
+        metadata: { stage: "1D-D-D" },
       })
       .returning()
   )[0];
@@ -395,6 +426,26 @@ async function releaseLoadReservationWithDb(
   )[0];
 
   if (!reservation) {
+    const existingReservation = (
+      await db
+        .select()
+        .from(loadReservations)
+        .where(
+          and(
+            eq(loadReservations.id, input.reservationId),
+            eq(loadReservations.organizationId, input.organizationId),
+          ),
+        )
+        .limit(1)
+    )[0];
+
+    if (
+      existingReservation?.status === "released" ||
+      existingReservation?.status === "expired"
+    ) {
+      return existingReservation;
+    }
+
     throw new DispatcherReservationDomainError(
       "RESERVATION_NOT_FOUND",
       `Active reservation ${input.reservationId} was not found for this organization.`,
