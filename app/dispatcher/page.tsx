@@ -45,6 +45,15 @@ type DispatcherAttentionItem = {
   detail: string;
   reason: string;
 };
+type ExplanationTone = "amber" | "gray" | "blue";
+type MatchingExplanationItem = {
+  id: string;
+  tone: ExplanationTone;
+  subject: string;
+  label: string;
+  message: string;
+  source: string;
+};
 
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
@@ -309,6 +318,58 @@ function DispatcherAttentionSection({
         </div>
       ) : (
         <EmptyState label="No current attention items." />
+      )}
+    </section>
+  );
+}
+
+function explanationToneClass(tone: ExplanationTone) {
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "blue") return "border-blue-200 bg-blue-50 text-blue-800";
+  return "border-gray-200 bg-gray-50 text-gray-700";
+}
+
+function MatchingExplanationSection({
+  items,
+}: {
+  items: MatchingExplanationItem[];
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader
+        title="Matching Explanations"
+        description="Read-only reasons derived from current matching freshness, readiness, suggestion validity, and temporary hold state."
+      />
+      {items.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {items.map((item) => (
+            <article
+              key={item.id}
+              className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="font-bold text-gray-950">{item.subject}</h3>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    {item.message}
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${explanationToneClass(
+                    item.tone,
+                  )}`}
+                >
+                  {item.label}
+                </span>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-gray-500">
+                Derived from {item.source}.
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState label="No current explanations." />
       )}
     </section>
   );
@@ -774,6 +835,94 @@ function buildDispatcherAttentionItems({
   return items.slice(0, 8);
 }
 
+function buildMatchingExplanationItems({
+  activeReservations,
+  data,
+  loadReadinessItems,
+  matchingIsReady,
+  reservationSuggestions,
+  vehicleReadinessItems,
+}: {
+  activeReservations: ReservationActionActiveReservation[];
+  data: Awaited<ReturnType<typeof getDispatcherCockpitData>>;
+  loadReadinessItems: OperationalReadiness<LoadReadinessStatus>[];
+  matchingIsReady: boolean;
+  reservationSuggestions: ReservationActionSuggestion[];
+  vehicleReadinessItems: OperationalReadiness<VehicleReadinessStatus>[];
+}) {
+  const items: MatchingExplanationItem[] = [];
+
+  if (!matchingIsReady) {
+    items.push({
+      id: "matching-context",
+      tone: "amber",
+      subject: "Matching context",
+      label: "Stale context",
+      message:
+        "Operational matching context is stale or unavailable, so reservation readiness requires review.",
+      source: "latest matching run freshness",
+    });
+  }
+
+  for (const suggestion of reservationSuggestions.filter((item) => item.isStale)) {
+    items.push({
+      id: `suggestion:${suggestion.suggestionId}`,
+      tone: "gray",
+      subject: suggestion.label,
+      label: "Suggestion unavailable",
+      message:
+        suggestion.staleReason ??
+        "Suggestion is unavailable because current readiness checks did not pass.",
+      source: "suggestion snapshot validation",
+    });
+  }
+
+  data.loads.forEach((load, index) => {
+    const readiness = loadReadinessItems[index];
+    if (!readiness || readiness.status === "reservable") return;
+
+    items.push({
+      id: `load:${load.id}`,
+      tone: readiness.status === "stale" ? "amber" : "gray",
+      subject: load.referenceNumber ?? load.externalId ?? load.id,
+      label: readiness.status === "reserved" ? "Temporary hold" : readiness.status,
+      message: readiness.reason,
+      source: "load readiness",
+    });
+  });
+
+  data.vehicles.forEach((vehicle, index) => {
+    const readiness = vehicleReadinessItems[index];
+    if (!readiness || readiness.status === "available") return;
+
+    items.push({
+      id: `vehicle:${vehicle.id}`,
+      tone: readiness.status === "stale_matching_context" ? "amber" : "blue",
+      subject: vehicle.unitNumber,
+      label:
+        readiness.status === "stale_matching_context"
+          ? "Stale context"
+          : readiness.status,
+      message: readiness.reason,
+      source: "vehicle readiness",
+    });
+  });
+
+  for (const reservation of activeReservations.filter((item) => item.isStale)) {
+    items.push({
+      id: `reservation:${reservation.reservationId}`,
+      tone: "amber",
+      subject: reservation.label,
+      label: "Review needed",
+      message:
+        "Temporary operational hold expires soon, so the reservation should be reviewed before readiness changes.",
+      source: "reservation expiration window",
+    });
+  }
+
+  return items.slice(0, 12);
+}
+
 export default async function DispatcherCockpitPage() {
   const data = await getDispatcherCockpitData();
   const now = new Date();
@@ -914,6 +1063,14 @@ export default async function DispatcherCockpitPage() {
       };
     });
   const attentionItems = buildDispatcherAttentionItems({
+    activeReservations,
+    data,
+    loadReadinessItems,
+    matchingIsReady,
+    reservationSuggestions,
+    vehicleReadinessItems,
+  });
+  const matchingExplanationItems = buildMatchingExplanationItems({
     activeReservations,
     data,
     loadReadinessItems,
@@ -1065,6 +1222,8 @@ export default async function DispatcherCockpitPage() {
           </section>
 
           <DispatcherAttentionSection items={attentionItems} />
+
+          <MatchingExplanationSection items={matchingExplanationItems} />
 
           <section className="space-y-3">
             <SectionHeader
