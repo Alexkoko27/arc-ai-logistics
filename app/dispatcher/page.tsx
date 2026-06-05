@@ -36,6 +36,15 @@ type OperationalReadiness<TStatus extends string> = {
   status: TStatus;
   reason: string;
 };
+type AttentionTone = "amber" | "gray" | "blue";
+type DispatcherAttentionItem = {
+  id: string;
+  tone: AttentionTone;
+  label: string;
+  title: string;
+  detail: string;
+  reason: string;
+};
 
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
@@ -254,6 +263,54 @@ function MetricCard({
       <p className="mt-2 text-2xl font-bold text-gray-950">{value}</p>
       <p className="mt-1 text-xs text-gray-500">{description}</p>
     </div>
+  );
+}
+
+function attentionToneClass(tone: AttentionTone) {
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "blue") return "border-blue-200 bg-blue-50 text-blue-800";
+  return "border-gray-200 bg-gray-50 text-gray-700";
+}
+
+function DispatcherAttentionSection({
+  items,
+}: {
+  items: DispatcherAttentionItem[];
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader
+        title="Dispatcher Attention"
+        description="Read-only operational review list derived from current readiness, suggestions, and reservation activity."
+      />
+      {items.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {items.map((item) => (
+            <article
+              key={item.id}
+              className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="font-bold text-gray-950">{item.title}</h3>
+                  <p className="mt-1 text-sm text-gray-600">{item.detail}</p>
+                </div>
+                <span
+                  className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${attentionToneClass(
+                    item.tone,
+                  )}`}
+                >
+                  {item.label}
+                </span>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-gray-500">{item.reason}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState label="No current attention items." />
+      )}
+    </section>
   );
 }
 
@@ -626,6 +683,97 @@ function staleReasonForSuggestion({
   });
 }
 
+function buildDispatcherAttentionItems({
+  activeReservations,
+  data,
+  loadReadinessItems,
+  matchingIsReady,
+  reservationSuggestions,
+  vehicleReadinessItems,
+}: {
+  activeReservations: ReservationActionActiveReservation[];
+  data: Awaited<ReturnType<typeof getDispatcherCockpitData>>;
+  loadReadinessItems: OperationalReadiness<LoadReadinessStatus>[];
+  matchingIsReady: boolean;
+  reservationSuggestions: ReservationActionSuggestion[];
+  vehicleReadinessItems: OperationalReadiness<VehicleReadinessStatus>[];
+}) {
+  const items: DispatcherAttentionItem[] = [];
+
+  for (const reservation of activeReservations.filter((item) => item.isStale)) {
+    items.push({
+      id: `reservation:${reservation.reservationId}`,
+      tone: "amber",
+      label: "Expiring reservation",
+      title: reservation.label,
+      detail: reservation.countdownLabel ?? reservation.expiresAt,
+      reason: "Temporary hold is close to expiration and needs review.",
+    });
+  }
+
+  for (const suggestion of reservationSuggestions.filter((item) => item.isStale).slice(0, 4)) {
+    items.push({
+      id: `suggestion:${suggestion.suggestionId}`,
+      tone: "gray",
+      label: "Stale matching",
+      title: suggestion.label,
+      detail: suggestion.scoreLabel || "Review suggested match",
+      reason: suggestion.staleReason ?? "Suggestion is unavailable for reservation.",
+    });
+  }
+
+  data.loads.forEach((load, index) => {
+    const readiness = loadReadinessItems[index];
+    if (!readiness || readiness.status === "reservable" || readiness.status === "reserved") {
+      return;
+    }
+
+    items.push({
+      id: `load:${load.id}`,
+      tone: readiness.status === "stale" ? "amber" : "gray",
+      label:
+        readiness.status === "stale"
+          ? "Stale matching"
+          : "Unavailable for reservation",
+      title: load.referenceNumber ?? load.externalId ?? load.id,
+      detail: load.status,
+      reason: readiness.reason,
+    });
+  });
+
+  data.vehicles.forEach((vehicle, index) => {
+    const readiness = vehicleReadinessItems[index];
+    if (!readiness || readiness.status === "available" || readiness.status === "reserved") {
+      return;
+    }
+
+    items.push({
+      id: `vehicle:${vehicle.id}`,
+      tone: readiness.status === "stale_matching_context" ? "amber" : "blue",
+      label:
+        readiness.status === "stale_matching_context"
+          ? "Stale matching"
+          : "Needs review",
+      title: vehicle.unitNumber,
+      detail: vehicle.status,
+      reason: readiness.reason,
+    });
+  });
+
+  if (!matchingIsReady && data.suggestions.length === 0) {
+    items.push({
+      id: "matching:no-current-run",
+      tone: "amber",
+      label: "Needs review",
+      title: "Matching context",
+      detail: "No fresh suggestions",
+      reason: "Fresh matching context is required before reservation selection.",
+    });
+  }
+
+  return items.slice(0, 8);
+}
+
 export default async function DispatcherCockpitPage() {
   const data = await getDispatcherCockpitData();
   const now = new Date();
@@ -765,6 +913,14 @@ export default async function DispatcherCockpitPage() {
         isStale: remainingMs <= HOLD_STALE_REMAINING_MINUTES * MINUTE_MS,
       };
     });
+  const attentionItems = buildDispatcherAttentionItems({
+    activeReservations,
+    data,
+    loadReadinessItems,
+    matchingIsReady,
+    reservationSuggestions,
+    vehicleReadinessItems,
+  });
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -907,6 +1063,8 @@ export default async function DispatcherCockpitPage() {
               description="Unavailable due to stale run, status, or hold state."
             />
           </section>
+
+          <DispatcherAttentionSection items={attentionItems} />
 
           <section className="space-y-3">
             <SectionHeader
