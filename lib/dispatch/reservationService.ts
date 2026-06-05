@@ -280,6 +280,10 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
     );
   }
 
+  if (input.vehicleId && input.vehicleId !== suggestion.vehicleId) {
+    throw new Error("Vehicle does not match the load suggestion vehicle.");
+  }
+
   const existingReservation = await findActiveReservationForSuggestion(db, input);
   if (existingReservation) return existingReservation;
 
@@ -308,10 +312,6 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
 
   if (load.status !== "available") {
     throw new ActiveLoadReservationConflictError(input.loadId);
-  }
-
-  if (input.vehicleId && input.vehicleId !== suggestion.vehicleId) {
-    throw new Error("Vehicle does not match the load suggestion vehicle.");
   }
 
   const resolvedVehicleId = suggestion.vehicleId;
