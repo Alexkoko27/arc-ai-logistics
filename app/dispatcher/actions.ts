@@ -17,7 +17,9 @@ import {
   assertDispatcherMutationAllowed,
 } from "@/lib/dispatch/mutationGuard";
 import {
-  describeVehicleMutationBoundary,
+  DispatcherVehicleDomainError,
+  createDispatcherVehicle,
+  editDispatcherVehicle,
 } from "@/lib/dispatch/vehicleService";
 import {
   dispatcherCreateLoadSchema,
@@ -118,6 +120,31 @@ function loadMutationFailure(error: unknown): DispatcherMutationActionResult {
   });
 }
 
+function vehicleMutationFailure(error: unknown): DispatcherMutationActionResult {
+  if (error instanceof DispatcherMutationBlockedError) {
+    return dispatcherActionFailure({
+      code: "DISPATCHER_MUTATION_BLOCKED",
+      message: error.message,
+    });
+  }
+
+  if (error instanceof z.ZodError) {
+    return validationFailure(error);
+  }
+
+  if (error instanceof DispatcherVehicleDomainError) {
+    return dispatcherActionFailure({
+      code: error.code,
+      message: error.message,
+    });
+  }
+
+  return dispatcherActionFailure({
+    code: "UNKNOWN_ERROR",
+    message: "Dispatcher vehicle mutation failed.",
+  });
+}
+
 export async function createDispatcherLoadAction(
   input: unknown,
 ): Promise<DispatcherMutationActionResult> {
@@ -151,27 +178,31 @@ export async function editDispatcherLoadAction(
 export async function createDispatcherVehicleAction(
   input: unknown,
 ): Promise<DispatcherMutationActionResult> {
-  return guardedAction({
-    context: "create dispatcher vehicle",
-    input,
-    schema: dispatcherCreateVehicleSchema,
-    describeBoundary: describeVehicleMutationBoundary,
-    foundationMessage:
-      "Vehicle creation is validated but not persisted in Stage 1D-A.",
-  });
+  try {
+    assertDispatcherMutationAllowed("create dispatcher vehicle");
+    const parsedInput = dispatcherCreateVehicleSchema.parse(input);
+    const result = await createDispatcherVehicle(parsedInput);
+    revalidatePath("/dispatcher");
+
+    return dispatcherActionSuccess(`Vehicle ${result.vehicleId} created.`);
+  } catch (error) {
+    return vehicleMutationFailure(error);
+  }
 }
 
 export async function editDispatcherVehicleAction(
   input: unknown,
 ): Promise<DispatcherMutationActionResult> {
-  return guardedAction({
-    context: "edit dispatcher vehicle",
-    input,
-    schema: dispatcherEditVehicleSchema,
-    describeBoundary: describeVehicleMutationBoundary,
-    foundationMessage:
-      "Vehicle editing is validated but not persisted in Stage 1D-A.",
-  });
+  try {
+    assertDispatcherMutationAllowed("edit dispatcher vehicle");
+    const parsedInput = dispatcherEditVehicleSchema.parse(input);
+    const result = await editDispatcherVehicle(parsedInput);
+    revalidatePath("/dispatcher");
+
+    return dispatcherActionSuccess(`Vehicle ${result.vehicleId} updated.`);
+  } catch (error) {
+    return vehicleMutationFailure(error);
+  }
 }
 
 export async function reserveDispatcherLoadAction(
