@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   releaseDispatcherReservationAction,
@@ -74,19 +74,11 @@ export default function ReservationActionPanel({
     activeReservations.find(
       (reservation) => reservation.reservationId === selectedReservationId,
     ) ?? null;
+  const suggestionSelectValue = selectedSuggestion ? selectedSuggestionId : "";
+  const reservationSelectValue = selectedReservation
+    ? selectedReservationId
+    : "";
   const resultDetails = fieldErrorMessages(result);
-
-  useEffect(() => {
-    if (!selectedSuggestionId) return;
-    if (selectedSuggestion) return;
-    setSelectedSuggestionId("");
-  }, [selectedSuggestion, selectedSuggestionId]);
-
-  useEffect(() => {
-    if (!selectedReservationId) return;
-    if (selectedReservation) return;
-    setSelectedReservationId("");
-  }, [selectedReservation, selectedReservationId]);
 
   function submitReserve() {
     if (!selectedSuggestion || isMutating) return;
@@ -193,7 +185,7 @@ export default function ReservationActionPanel({
             <span className="font-semibold text-gray-700">Suggestion</span>
             <select
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-              value={selectedSuggestionId}
+              value={suggestionSelectValue}
               disabled={isMutating || reservableSuggestions.length === 0}
               onChange={(event) => setSelectedSuggestionId(event.target.value)}
             >
@@ -247,7 +239,7 @@ export default function ReservationActionPanel({
             <span className="font-semibold text-gray-700">Active reservation</span>
             <select
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-              value={selectedReservationId}
+              value={reservationSelectValue}
               disabled={isMutating || activeReservations.length === 0}
               onChange={(event) => setSelectedReservationId(event.target.value)}
             >
