@@ -50,6 +50,20 @@ function toIsoDate(value: string) {
   return new Date(value).toISOString();
 }
 
+function dateFromLoadValue(value: string) {
+  if (!value) return null;
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value);
+  const date = new Date(hasTimezone ? value : `${value}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toDateTimeLocalValue(value: string) {
+  const date = dateFromLoadValue(value);
+  if (!date) return "";
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
+
 function resultClass(result: DispatcherMutationActionResult | null) {
   if (!result) return "hidden";
   return result.success
@@ -265,10 +279,10 @@ export default function LoadMutationPanel({
       weightLbs: load.weightLbs,
       rateAmount: load.rateAmount,
       distanceMiles: load.distanceMiles,
-      pickupStartsAt: load.pickupStartsAt,
-      pickupEndsAt: load.pickupEndsAt,
-      deliveryStartsAt: load.deliveryStartsAt,
-      deliveryEndsAt: load.deliveryEndsAt,
+      pickupStartsAt: toDateTimeLocalValue(load.pickupStartsAt),
+      pickupEndsAt: toDateTimeLocalValue(load.pickupEndsAt),
+      deliveryStartsAt: toDateTimeLocalValue(load.deliveryStartsAt),
+      deliveryEndsAt: toDateTimeLocalValue(load.deliveryEndsAt),
       pickupCity: load.pickupCity,
       pickupState: load.pickupState,
       dropoffCity: load.dropoffCity,
