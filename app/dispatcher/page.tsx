@@ -54,6 +54,25 @@ type MatchingExplanationItem = {
   message: string;
   source: string;
 };
+type FreshnessTone = "green" | "amber" | "gray";
+type FreshnessState = "recent" | "aging" | "stale" | "unavailable";
+type MatchingFreshnessSnapshot = {
+  state: FreshnessState;
+  tone: FreshnessTone;
+  ageLabel: string;
+  confidenceLabel: string;
+  detail: string;
+  generatedAtLabel: string;
+  staleDurationLabel: string | null;
+};
+type OperationalFreshnessItem = {
+  id: string;
+  tone: FreshnessTone;
+  title: string;
+  label: string;
+  detail: string;
+  confidence: string;
+};
 
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
@@ -103,6 +122,65 @@ function formatScore(value: string | null) {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return value;
   return numericValue.toFixed(1);
+}
+
+function matchingFreshnessSnapshot({
+  ageMs,
+  isReady,
+  latestRun,
+}: {
+  ageMs: number | null;
+  isReady: boolean;
+  latestRun: Awaited<ReturnType<typeof getDispatcherCockpitData>>["latestMatchingRun"];
+}): MatchingFreshnessSnapshot {
+  if (!latestRun || ageMs === null) {
+    return {
+      state: "unavailable",
+      tone: "gray",
+      ageLabel: "Matching age unavailable",
+      confidenceLabel: "Freshness unavailable",
+      detail: "No matching run is available for current operational review.",
+      generatedAtLabel: "Not set",
+      staleDurationLabel: null,
+    };
+  }
+
+  const staleDurationMs = ageMs - MATCHING_STALE_AFTER_MINUTES * MINUTE_MS;
+
+  if (!isReady) {
+    return {
+      state: "stale",
+      tone: "amber",
+      ageLabel: `${formatDuration(ageMs)} old`,
+      confidenceLabel: "Review freshness",
+      detail: "Matching context is outside the current freshness window.",
+      generatedAtLabel: formatDate(latestRun.row.createdAt),
+      staleDurationLabel:
+        staleDurationMs > 0 ? `stale for ${formatDuration(staleDurationMs)}` : null,
+    };
+  }
+
+  if (ageMs > MATCHING_STALE_AFTER_MINUTES * MINUTE_MS * 0.5) {
+    return {
+      state: "aging",
+      tone: "amber",
+      ageLabel: `${formatDuration(ageMs)} old`,
+      confidenceLabel: "Moderate operational confidence",
+      detail: "Matching context is still current but aging.",
+      generatedAtLabel: formatDate(latestRun.row.createdAt),
+      staleDurationLabel: null,
+    };
+  }
+
+  return {
+    state: "recent",
+    tone: "green",
+    ageLabel: `${formatDuration(ageMs)} old`,
+    confidenceLabel: "High operational confidence",
+    detail: "Matching context was updated recently.",
+    generatedAtLabel: formatDate(latestRun.row.createdAt),
+    staleDurationLabel: null,
+  };
 }
 
 function locationLabel(
@@ -272,6 +350,54 @@ function MetricCard({
       <p className="mt-2 text-2xl font-bold text-gray-950">{value}</p>
       <p className="mt-1 text-xs text-gray-500">{description}</p>
     </div>
+  );
+}
+
+function freshnessToneClass(tone: FreshnessTone) {
+  if (tone === "green") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-gray-200 bg-gray-50 text-gray-600";
+}
+
+function OperationalFreshnessSection({
+  items,
+}: {
+  items: OperationalFreshnessItem[];
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader
+        title="Operational Freshness"
+        description="Read-only freshness age and confidence indicators derived from matching timestamps, suggestions, and active temporary holds."
+      />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {items.map((item) => (
+          <article
+            key={item.id}
+            className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="font-bold text-gray-950">{item.title}</h3>
+                <p className="mt-1 text-sm leading-6 text-gray-600">
+                  {item.detail}
+                </p>
+              </div>
+              <span
+                className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${freshnessToneClass(
+                  item.tone,
+                )}`}
+              >
+                {item.label}
+              </span>
+            </div>
+            <p className="mt-3 text-xs font-semibold text-gray-500">
+              {item.confidence}
+            </p>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -552,9 +678,11 @@ function LoadTable({
 
 function SuggestionCard({
   suggestion,
+  matchingFreshness,
   matchingIsStale,
 }: {
   suggestion: DispatcherSuggestionView;
+  matchingFreshness: MatchingFreshnessSnapshot;
   matchingIsStale: boolean;
 }) {
   const activeReservation = suggestion.activeReservation;
@@ -578,10 +706,19 @@ function SuggestionCard({
           <p className="mt-1 text-xs text-gray-500">
             Suggestion persisted {formatDate(suggestion.row.createdAt)}
           </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Matching age {matchingFreshness.ageLabel}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <StatusBadge status={suggestion.row.status} />
-          {matchingIsStale ? <StatusBadge status="stale" /> : <StatusBadge status="fresh" />}
+          <span
+            className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${freshnessToneClass(
+              matchingFreshness.tone,
+            )}`}
+          >
+            {matchingIsStale ? "stale" : matchingFreshness.state}
+          </span>
           {activeReservation ? (
             <StatusBadge status={activeReservation.status} />
           ) : null}
@@ -620,6 +757,9 @@ function SuggestionCard({
           <p className="mt-1 font-semibold text-gray-950">{reservationLabel}</p>
         </div>
       </div>
+      <p className="mt-3 text-xs font-semibold text-gray-500">
+        {matchingFreshness.confidenceLabel}
+      </p>
 
       <div className="mt-4 grid gap-3 text-sm lg:grid-cols-2">
         <div>
@@ -923,6 +1063,72 @@ function buildMatchingExplanationItems({
   return items.slice(0, 12);
 }
 
+function buildOperationalFreshnessItems({
+  activeReservations,
+  matchingFreshness,
+  staleSuggestionCount,
+  suggestionCount,
+}: {
+  activeReservations: ReservationActionActiveReservation[];
+  matchingFreshness: MatchingFreshnessSnapshot;
+  staleSuggestionCount: number;
+  suggestionCount: number;
+}) {
+  const expiringHoldCount = activeReservations.filter((item) => item.isStale).length;
+  const holdAgeSummary =
+    activeReservations.length > 0
+      ? activeReservations
+          .map((item) => item.ageLabel)
+          .slice(0, 3)
+          .join(", ")
+      : null;
+
+  return [
+    {
+      id: "matching-context",
+      tone: matchingFreshness.tone,
+      title: "Matching context",
+      label: matchingFreshness.state,
+      detail: [
+        `Generated ${matchingFreshness.generatedAtLabel}.`,
+        `Matching age ${matchingFreshness.ageLabel}.`,
+        matchingFreshness.staleDurationLabel,
+      ]
+        .filter(Boolean)
+        .join(" "),
+      confidence: matchingFreshness.confidenceLabel,
+    },
+    {
+      id: "suggestion-freshness",
+      tone: staleSuggestionCount > 0 ? "amber" : matchingFreshness.tone,
+      title: "Suggestion freshness",
+      label: staleSuggestionCount > 0 ? "review freshness" : matchingFreshness.state,
+      detail:
+        suggestionCount > 0
+          ? `${staleSuggestionCount} of ${suggestionCount} suggestions need freshness review.`
+          : "No current suggestions are available for freshness review.",
+      confidence:
+        staleSuggestionCount > 0
+          ? "Derived confidence is reduced by unavailable suggestions."
+          : matchingFreshness.confidenceLabel,
+    },
+    {
+      id: "hold-freshness",
+      tone: expiringHoldCount > 0 ? "amber" : "gray",
+      title: "Temporary hold freshness",
+      label: expiringHoldCount > 0 ? "aging" : "recent",
+      detail:
+        activeReservations.length > 0
+          ? `${expiringHoldCount} of ${activeReservations.length} active holds are near expiration. Hold ages ${holdAgeSummary}.`
+          : "No active temporary holds are affecting freshness review.",
+      confidence:
+        expiringHoldCount > 0
+          ? "Review freshness before hold availability changes."
+          : "No active hold freshness pressure.",
+    },
+  ] satisfies OperationalFreshnessItem[];
+}
+
 export default async function DispatcherCockpitPage() {
   const data = await getDispatcherCockpitData();
   const now = new Date();
@@ -935,7 +1141,12 @@ export default async function DispatcherCockpitPage() {
     matchingAgeMs !== null &&
     matchingAgeMs > MATCHING_STALE_AFTER_MINUTES * MINUTE_MS;
   const matchingIsReady = latestRun !== null && matchingIsCompleted && !matchingIsStale;
-  const matchingFreshness = latestRun
+  const matchingFreshnessSnapshotValue = matchingFreshnessSnapshot({
+    ageMs: matchingAgeMs,
+    isReady: matchingIsReady,
+    latestRun,
+  });
+  const reservationMatchingFreshness = latestRun
     ? {
         generatedAtLabel: formatDate(latestRun.row.createdAt),
         ageLabel: `${formatDuration(matchingAgeMs ?? 0)} old`,
@@ -1078,6 +1289,12 @@ export default async function DispatcherCockpitPage() {
     reservationSuggestions,
     vehicleReadinessItems,
   });
+  const operationalFreshnessItems = buildOperationalFreshnessItems({
+    activeReservations,
+    matchingFreshness: matchingFreshnessSnapshotValue,
+    staleSuggestionCount,
+    suggestionCount: reservationSuggestions.length,
+  });
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -1100,9 +1317,13 @@ export default async function DispatcherCockpitPage() {
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
             Dispatcher mutations guarded
           </span>
-          {matchingFreshness ? (
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${matchingIsReady ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
-              Matching {matchingIsReady ? "fresh" : "stale"}
+          {latestRun ? (
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${freshnessToneClass(
+                matchingFreshnessSnapshotValue.tone,
+              )}`}
+            >
+              Matching {matchingFreshnessSnapshotValue.state}
             </span>
           ) : null}
           <Link
@@ -1119,7 +1340,7 @@ export default async function DispatcherCockpitPage() {
           organizationId={data.organization.id}
           suggestions={reservationSuggestions}
           activeReservations={activeReservations}
-          matchingFreshness={matchingFreshness}
+          matchingFreshness={reservationMatchingFreshness}
         />
       ) : null}
 
@@ -1222,6 +1443,8 @@ export default async function DispatcherCockpitPage() {
           </section>
 
           <DispatcherAttentionSection items={attentionItems} />
+
+          <OperationalFreshnessSection items={operationalFreshnessItems} />
 
           <MatchingExplanationSection items={matchingExplanationItems} />
 
@@ -1343,6 +1566,7 @@ export default async function DispatcherCockpitPage() {
                   <SuggestionCard
                     key={suggestion.row.id}
                     suggestion={suggestion}
+                    matchingFreshness={matchingFreshnessSnapshotValue}
                     matchingIsStale={!matchingIsReady}
                   />
                 ))}
