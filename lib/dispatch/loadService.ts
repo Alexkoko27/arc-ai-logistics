@@ -354,7 +354,6 @@ async function buildStopSyncPlan({
   db,
   organizationId,
   input,
-  existingLoad,
   existingStop,
   locationInput,
   startKey,
@@ -367,7 +366,6 @@ async function buildStopSyncPlan({
   db: MutationDb;
   organizationId: string;
   input: DispatcherEditLoadInput;
-  existingLoad: LoadRow;
   existingStop: LoadStopRow | undefined;
   locationInput: DispatcherLocationInput | undefined;
   startKey: "pickupStartsAt" | "deliveryStartsAt";
@@ -484,7 +482,6 @@ async function editDispatcherLoadWithDb(
     db,
     organizationId: input.organizationId,
     input,
-    existingLoad,
     existingStop: existingPickupStop,
     locationInput: input.pickupLocation,
     startKey: "pickupStartsAt",
@@ -498,7 +495,6 @@ async function editDispatcherLoadWithDb(
     db,
     organizationId: input.organizationId,
     input,
-    existingLoad,
     existingStop: existingDropoffStop,
     locationInput: input.dropoffLocation,
     startKey: "deliveryStartsAt",
