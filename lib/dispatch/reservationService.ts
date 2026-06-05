@@ -30,7 +30,9 @@ type ReleaseReservationInput = {
   releaseReason?: "released" | "expired" | "cancelled";
 };
 
-export type DispatcherReservationDomainErrorCode = "RESERVATION_NOT_FOUND";
+export type DispatcherReservationDomainErrorCode =
+  | "LOAD_SUGGESTION_NOT_RESERVABLE"
+  | "RESERVATION_NOT_FOUND";
 
 export class DispatcherReservationDomainError extends Error {
   constructor(
@@ -170,6 +172,13 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
 
     if (suggestion.loadId !== input.loadId) {
       throw new Error("Load suggestion does not belong to the reserved load.");
+    }
+
+    if (suggestion.status !== "suggested") {
+      throw new DispatcherReservationDomainError(
+        "LOAD_SUGGESTION_NOT_RESERVABLE",
+        "Only suggested load suggestions can be reserved.",
+      );
     }
 
     if (resolvedVehicleId && resolvedVehicleId !== suggestion.vehicleId) {
