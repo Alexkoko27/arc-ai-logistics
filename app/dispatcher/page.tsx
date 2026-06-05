@@ -2,6 +2,9 @@ import Link from "next/link";
 import LoadMutationPanel, {
   type LoadMutationPanelLoad,
 } from "@/components/dispatcher/LoadMutationPanel";
+import VehicleMutationPanel, {
+  type VehicleMutationPanelVehicle,
+} from "@/components/dispatcher/VehicleMutationPanel";
 import {
   type DispatcherLoadView,
   type DispatcherSuggestionView,
@@ -341,6 +344,19 @@ function SuggestionCard({
 export default async function DispatcherCockpitPage() {
   const data = await getDispatcherCockpitData();
   const latestRun = data.latestMatchingRun;
+  const editableVehicles: VehicleMutationPanelVehicle[] = data.vehicles.map(
+    (vehicle) => ({
+      id: vehicle.id,
+      label: [vehicle.unitNumber, vehicle.equipmentType]
+        .filter(Boolean)
+        .join(" | "),
+      unitNumber: vehicle.unitNumber,
+      vin: vehicle.vin ?? "",
+      equipmentType: vehicle.equipmentType ?? "",
+      status: vehicle.status,
+      expectedAvailableAt: formatDateInput(vehicle.expectedAvailableAt),
+    }),
+  );
   const editableLoads: LoadMutationPanelLoad[] = data.loads
     .filter((load) => load.status === "available" && !load.activeReservation)
     .map((load) => {
@@ -372,21 +388,21 @@ export default async function DispatcherCockpitPage() {
       <header className="flex flex-col gap-4 border-b border-gray-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-            Stage 1C Dispatcher Cockpit
+            Stage 1D Dispatcher Operations
           </p>
           <h1 className="text-2xl font-bold text-gray-950 sm:text-3xl">
             Dispatcher Operations Cockpit
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
-            Read-only operations view for Stage 1B vehicles, loads, matching
-            runs, load suggestions, and load reservations. Load, LoadSuggestion,
-            LoadReservation, Deal, Shipment, Dispatch, and Settlement remain
-            separate concepts.
+            Operations view for Stage 1B vehicles, loads, matching runs, load
+            suggestions, and load reservations, with dispatcher-only load and
+            vehicle resource mutations. Load, LoadSuggestion, LoadReservation,
+            Deal, Shipment, Dispatch, and Settlement remain separate concepts.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-            Read-only
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            Dispatcher mutations guarded
           </span>
           <Link
             className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
@@ -396,6 +412,13 @@ export default async function DispatcherCockpitPage() {
           </Link>
         </div>
       </header>
+
+      {data.organization ? (
+        <VehicleMutationPanel
+          organizationId={data.organization.id}
+          editableVehicles={editableVehicles}
+        />
+      ) : null}
 
       {data.organization ? (
         <LoadMutationPanel
