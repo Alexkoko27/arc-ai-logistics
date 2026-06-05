@@ -238,7 +238,7 @@ export const dispatcherReserveLoadSchema = z.object({
 export const dispatcherReleaseReservationSchema = z.object({
   organizationId: uuidSchema,
   reservationId: uuidSchema,
-  releaseReason: z.enum(["released", "expired", "cancelled"]).default("released"),
+  releaseReason: z.enum(["released", "expired"]).default("released"),
 });
 
 export type DispatcherCreateLoadInput = z.infer<
