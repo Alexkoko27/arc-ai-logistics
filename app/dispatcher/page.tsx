@@ -55,7 +55,7 @@ type MatchingExplanationItem = {
   source: string;
 };
 type FreshnessTone = "green" | "amber" | "gray";
-type FreshnessState = "recent" | "aging" | "stale" | "unavailable";
+type FreshnessState = "fresh" | "aging" | "stale" | "pending" | "unavailable";
 type MatchingFreshnessSnapshot = {
   state: FreshnessState;
   tone: FreshnessTone;
@@ -126,11 +126,11 @@ function formatScore(value: string | null) {
 
 function matchingFreshnessSnapshot({
   ageMs,
-  isReady,
+  isCompleted,
   latestRun,
 }: {
   ageMs: number | null;
-  isReady: boolean;
+  isCompleted: boolean;
   latestRun: Awaited<ReturnType<typeof getDispatcherCockpitData>>["latestMatchingRun"];
 }): MatchingFreshnessSnapshot {
   if (!latestRun || ageMs === null) {
@@ -147,7 +147,19 @@ function matchingFreshnessSnapshot({
 
   const staleDurationMs = ageMs - MATCHING_STALE_AFTER_MINUTES * MINUTE_MS;
 
-  if (!isReady) {
+  if (!isCompleted) {
+    return {
+      state: "pending",
+      tone: "gray",
+      ageLabel: `${formatDuration(ageMs)} old`,
+      confidenceLabel: "Matching run not ready",
+      detail: "Matching run has not completed, so freshness age is informational only.",
+      generatedAtLabel: formatDate(latestRun.row.createdAt),
+      staleDurationLabel: null,
+    };
+  }
+
+  if (staleDurationMs > 0) {
     return {
       state: "stale",
       tone: "amber",
@@ -173,7 +185,7 @@ function matchingFreshnessSnapshot({
   }
 
   return {
-    state: "recent",
+    state: "fresh",
     tone: "green",
     ageLabel: `${formatDuration(ageMs)} old`,
     confidenceLabel: "High operational confidence",
@@ -289,7 +301,7 @@ function statusClass(status: string) {
     return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
-  if (["released", "expired", "cancelled", "dismissed", "unavailable"].includes(status)) {
+  if (["released", "expired", "cancelled", "dismissed", "unavailable", "pending"].includes(status)) {
     return "border-gray-200 bg-gray-50 text-gray-600";
   }
 
@@ -368,7 +380,7 @@ function OperationalFreshnessSection({
     <section className="space-y-3">
       <SectionHeader
         title="Operational Freshness"
-        description="Read-only freshness age and confidence indicators derived from matching timestamps, suggestions, and active temporary holds."
+        description="Read-only matching freshness age with adjacent suggestion readiness and temporary hold availability indicators."
       />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {items.map((item) => (
@@ -679,11 +691,9 @@ function LoadTable({
 function SuggestionCard({
   suggestion,
   matchingFreshness,
-  matchingIsStale,
 }: {
   suggestion: DispatcherSuggestionView;
   matchingFreshness: MatchingFreshnessSnapshot;
-  matchingIsStale: boolean;
 }) {
   const activeReservation = suggestion.activeReservation;
   const reservationLabel = activeReservation
@@ -717,7 +727,7 @@ function SuggestionCard({
               matchingFreshness.tone,
             )}`}
           >
-            {matchingIsStale ? "stale" : matchingFreshness.state}
+            {matchingFreshness.state}
           </span>
           {activeReservation ? (
             <StatusBadge status={activeReservation.status} />
@@ -1066,12 +1076,12 @@ function buildMatchingExplanationItems({
 function buildOperationalFreshnessItems({
   activeReservations,
   matchingFreshness,
-  staleSuggestionCount,
+  suggestionReviewCount,
   suggestionCount,
 }: {
   activeReservations: ReservationActionActiveReservation[];
   matchingFreshness: MatchingFreshnessSnapshot;
-  staleSuggestionCount: number;
+  suggestionReviewCount: number;
   suggestionCount: number;
 }) {
   const expiringHoldCount = activeReservations.filter((item) => item.isStale).length;
@@ -1099,32 +1109,32 @@ function buildOperationalFreshnessItems({
       confidence: matchingFreshness.confidenceLabel,
     },
     {
-      id: "suggestion-freshness",
-      tone: staleSuggestionCount > 0 ? "amber" : matchingFreshness.tone,
-      title: "Suggestion freshness",
-      label: staleSuggestionCount > 0 ? "review freshness" : matchingFreshness.state,
+      id: "suggestion-readiness",
+      tone: suggestionReviewCount > 0 ? "amber" : "green",
+      title: "Suggestion readiness",
+      label: suggestionReviewCount > 0 ? "readiness review" : "reservable",
       detail:
         suggestionCount > 0
-          ? `${staleSuggestionCount} of ${suggestionCount} suggestions need freshness review.`
-          : "No current suggestions are available for freshness review.",
+          ? `${suggestionReviewCount} of ${suggestionCount} suggestions are unavailable for reservation review.`
+          : "No current suggestions are available for reservation review.",
       confidence:
-        staleSuggestionCount > 0
-          ? "Derived confidence is reduced by unavailable suggestions."
-          : matchingFreshness.confidenceLabel,
+        suggestionReviewCount > 0
+          ? "Derived from reservability checks, not matching age alone."
+          : "Current suggestions pass reservation readiness checks.",
     },
     {
-      id: "hold-freshness",
+      id: "hold-availability",
       tone: expiringHoldCount > 0 ? "amber" : "gray",
-      title: "Temporary hold freshness",
-      label: expiringHoldCount > 0 ? "aging" : "recent",
+      title: "Temporary hold availability",
+      label: expiringHoldCount > 0 ? "hold review" : "no pressure",
       detail:
         activeReservations.length > 0
           ? `${expiringHoldCount} of ${activeReservations.length} active holds are near expiration. Hold ages ${holdAgeSummary}.`
-          : "No active temporary holds are affecting freshness review.",
+          : "No active temporary holds are affecting availability review.",
       confidence:
         expiringHoldCount > 0
-          ? "Review freshness before hold availability changes."
-          : "No active hold freshness pressure.",
+          ? "Review hold availability before expiration changes reservability."
+          : "No active hold availability pressure.",
     },
   ] satisfies OperationalFreshnessItem[];
 }
@@ -1143,14 +1153,14 @@ export default async function DispatcherCockpitPage() {
   const matchingIsReady = latestRun !== null && matchingIsCompleted && !matchingIsStale;
   const matchingFreshnessSnapshotValue = matchingFreshnessSnapshot({
     ageMs: matchingAgeMs,
-    isReady: matchingIsReady,
+    isCompleted: matchingIsCompleted,
     latestRun,
   });
-  const reservationMatchingFreshness = latestRun
+  const reservationMatchingFreshness = latestRun && matchingIsCompleted
     ? {
         generatedAtLabel: formatDate(latestRun.row.createdAt),
         ageLabel: `${formatDuration(matchingAgeMs ?? 0)} old`,
-        isStale: !matchingIsReady,
+        isStale: matchingIsStale,
       }
     : null;
   const activeReservationByVehicleId = new Map(
@@ -1187,7 +1197,7 @@ export default async function DispatcherCockpitPage() {
   const reservableSuggestionCount = reservationSuggestions.filter(
     (suggestion) => suggestion.isReservable,
   ).length;
-  const staleSuggestionCount = reservationSuggestions.length - reservableSuggestionCount;
+  const suggestionReviewCount = reservationSuggestions.length - reservableSuggestionCount;
   const reservableLoadIds = new Set(
     reservationSuggestions
       .filter((suggestion) => suggestion.isReservable)
@@ -1292,7 +1302,7 @@ export default async function DispatcherCockpitPage() {
   const operationalFreshnessItems = buildOperationalFreshnessItems({
     activeReservations,
     matchingFreshness: matchingFreshnessSnapshotValue,
-    staleSuggestionCount,
+    suggestionReviewCount,
     suggestionCount: reservationSuggestions.length,
   });
 
@@ -1436,9 +1446,9 @@ export default async function DispatcherCockpitPage() {
               description="Fresh suggested loads without active holds."
             />
             <MetricCard
-              label="Stale suggestions"
-              value={staleSuggestionCount}
-              description="Unavailable due to stale run, status, or hold state."
+              label="Suggestions needing review"
+              value={suggestionReviewCount}
+              description="Unavailable due to readiness, hold, status, or matching context."
             />
           </section>
 
@@ -1499,7 +1509,7 @@ export default async function DispatcherCockpitPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <StatusBadge status={latestRun.row.status} />
-                      <StatusBadge status={matchingIsReady ? "fresh" : "stale"} />
+                      <StatusBadge status={matchingFreshnessSnapshotValue.state} />
                       <span className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600">
                         Created {formatDate(latestRun.row.createdAt)}
                       </span>
@@ -1567,7 +1577,6 @@ export default async function DispatcherCockpitPage() {
                     key={suggestion.row.id}
                     suggestion={suggestion}
                     matchingFreshness={matchingFreshnessSnapshotValue}
-                    matchingIsStale={!matchingIsReady}
                   />
                 ))}
               </div>
