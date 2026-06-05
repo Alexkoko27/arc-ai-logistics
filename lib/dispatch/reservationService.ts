@@ -27,7 +27,13 @@ type ReserveLoadInput = {
 type ReleaseReservationInput = {
   organizationId: string;
   reservationId: string;
-  releaseReason?: "released" | "expired" | "cancelled";
+  releaseReason?: "released" | "expired";
+};
+
+type ExpireReservationsInput = {
+  organizationId: string;
+  loadId?: string;
+  now?: Date;
 };
 
 export type DispatcherReservationDomainErrorCode =
@@ -95,6 +101,83 @@ async function lockLoadReservationWriteBoundary(db: MutationDb) {
   await db.execute(sql`lock table load_reservations in share row exclusive mode`);
 }
 
+async function releaseExpiredReservationsWithDb(
+  db: MutationDb,
+  input: ExpireReservationsInput,
+) {
+  const now = input.now ?? new Date();
+  const expiredReservations = await db
+    .update(loadReservations)
+    .set({ status: "expired", releasedAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(loadReservations.organizationId, input.organizationId),
+        eq(loadReservations.status, "active"),
+        input.loadId ? eq(loadReservations.loadId, input.loadId) : undefined,
+        sql`${loadReservations.expiresAt} <= ${now}`,
+      ),
+    )
+    .returning();
+
+  for (const reservation of expiredReservations) {
+    const remainingActiveReservation = (
+      await db
+        .select({ id: loadReservations.id })
+        .from(loadReservations)
+        .where(
+          and(
+            eq(loadReservations.organizationId, reservation.organizationId),
+            eq(loadReservations.loadId, reservation.loadId),
+            eq(loadReservations.status, "active"),
+          ),
+        )
+        .limit(1)
+    )[0];
+
+    if (!remainingActiveReservation) {
+      await db
+        .update(loads)
+        .set({ status: "available", updatedAt: now })
+        .where(
+          and(
+            eq(loads.id, reservation.loadId),
+            eq(loads.organizationId, reservation.organizationId),
+            eq(loads.status, "reserved"),
+          ),
+        );
+    }
+
+    await db
+      .update(loadSuggestions)
+      .set({
+        status: "suggested",
+        outcome: "reservation_expired",
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(loadSuggestions.id, reservation.loadSuggestionId),
+          eq(loadSuggestions.organizationId, reservation.organizationId),
+          eq(loadSuggestions.loadId, reservation.loadId),
+        ),
+      );
+  }
+
+  return expiredReservations;
+}
+
+export async function expireDispatcherReservations({
+  db = getDb(),
+  ...input
+}: ExpireReservationsInput & { db?: Db }) {
+  assertDevDispatcherDatabaseTarget("expire dispatcher reservations");
+
+  return db.transaction(async (tx) => {
+    await lockLoadReservationWriteBoundary(tx);
+    return releaseExpiredReservationsWithDb(tx, input);
+  });
+}
+
 async function assertVehicleBelongsToOrganization(
   db: MutationDb,
   organizationId: string,
@@ -133,6 +216,10 @@ async function assertDriverBelongsToOrganization(
 
 async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
   await lockLoadReservationWriteBoundary(db);
+  await releaseExpiredReservationsWithDb(db, {
+    organizationId: input.organizationId,
+    loadId: input.loadId,
+  });
 
   const load = (
     await db
@@ -220,7 +307,7 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
         reservedByUserId: input.reservedByUserId ?? null,
         status: "active",
         expiresAt: toDate(input.expiresAt) ?? new Date(Date.now() + 30 * 60 * 1000),
-        metadata: { stage: "1D-D-A" },
+        metadata: { stage: "1D-D-C" },
       })
       .returning()
   )[0];
@@ -287,6 +374,7 @@ async function releaseLoadReservationWithDb(
   input: Required<ReleaseReservationInput>,
 ) {
   await lockLoadReservationWriteBoundary(db);
+  await releaseExpiredReservationsWithDb(db, { organizationId: input.organizationId });
 
   const reservation = (
     await db
@@ -340,22 +428,20 @@ async function releaseLoadReservationWithDb(
       );
   }
 
-  if (reservation.loadSuggestionId) {
-    await db
-      .update(loadSuggestions)
-      .set({
-        status: "suggested",
-        outcome: "reservation_released",
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(loadSuggestions.id, reservation.loadSuggestionId),
-          eq(loadSuggestions.organizationId, reservation.organizationId),
-          eq(loadSuggestions.loadId, reservation.loadId),
-        ),
-      );
-  }
+  await db
+    .update(loadSuggestions)
+    .set({
+      status: "suggested",
+      outcome: "reservation_released",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(loadSuggestions.id, reservation.loadSuggestionId),
+        eq(loadSuggestions.organizationId, reservation.organizationId),
+        eq(loadSuggestions.loadId, reservation.loadId),
+      ),
+    );
 
   return reservation;
 }
