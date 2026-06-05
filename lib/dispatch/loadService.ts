@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "../db/client";
 import {
   loadReservations,
@@ -17,7 +17,10 @@ type TransactionDb = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type MutationDb = Db | TransactionDb;
 type LoadInsert = typeof loads.$inferInsert;
 type LoadUpdate = Partial<LoadInsert>;
+type LoadRow = typeof loads.$inferSelect;
+type LoadStopRow = typeof loadStops.$inferSelect;
 type LocationInsert = typeof locations.$inferInsert;
+type DateInput = string | Date | null | undefined;
 
 const dispatcherUiSourceId = "dispatcher-ui";
 
@@ -47,12 +50,40 @@ export class DispatcherLoadDomainError extends Error {
   }
 }
 
-function toDate(value: string | undefined) {
-  return value ? new Date(value) : null;
+function hasOwn(input: object, key: keyof DispatcherLoadMutationInput) {
+  return Object.prototype.hasOwnProperty.call(input, key);
+}
+
+function toDate(value: DateInput) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  return new Date(value);
 }
 
 function nullable<T>(value: T | undefined) {
   return value ?? null;
+}
+
+function datesEqual(left: DateInput, right: DateInput) {
+  const leftDate = toDate(left);
+  const rightDate = toDate(right);
+  if (!leftDate && !rightDate) return true;
+  if (!leftDate || !rightDate) return false;
+  return leftDate.getTime() === rightDate.getTime();
+}
+
+function nullableEqual(left: unknown, right: unknown) {
+  return (left ?? null) === (right ?? null);
+}
+
+function decimalEqual(left: string | null, right: string | null | undefined) {
+  if (!left && !right) return true;
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+    return leftNumber === rightNumber;
+  }
+  return (left ?? null) === (right ?? null);
 }
 
 function loadFields(input: DispatcherLoadMutationInput): LoadUpdate {
@@ -79,6 +110,26 @@ function loadFields(input: DispatcherLoadMutationInput): LoadUpdate {
       "deliveryEndsAt" in input ? toDate(input.deliveryEndsAt) : undefined,
     updatedAt: new Date(),
   };
+}
+
+function loadFieldChanged(
+  existingLoad: LoadRow,
+  key: string,
+  value: LoadUpdate[keyof LoadUpdate],
+) {
+  if (key === "pickupStartsAt") return !datesEqual(existingLoad.pickupStartsAt, value as DateInput);
+  if (key === "pickupEndsAt") return !datesEqual(existingLoad.pickupEndsAt, value as DateInput);
+  if (key === "deliveryStartsAt") return !datesEqual(existingLoad.deliveryStartsAt, value as DateInput);
+  if (key === "deliveryEndsAt") return !datesEqual(existingLoad.deliveryEndsAt, value as DateInput);
+  if (key === "rateAmount") return !decimalEqual(existingLoad.rateAmount, value as string | null);
+  if (key === "distanceMiles") {
+    return !decimalEqual(existingLoad.distanceMiles, value as string | null);
+  }
+
+  return !nullableEqual(
+    existingLoad[key as keyof LoadRow],
+    value,
+  );
 }
 
 function locationFields(
@@ -161,8 +212,8 @@ async function upsertLoadStop({
   locationId: string;
   stopType: "pickup" | "dropoff";
   sequence: 1 | 2;
-  appointmentStartsAt?: string;
-  appointmentEndsAt?: string;
+  appointmentStartsAt?: DateInput;
+  appointmentEndsAt?: DateInput;
 }) {
   const stop = (
     await db
@@ -199,6 +250,10 @@ async function upsertLoadStop({
 
   if (!stop) throw new Error(`Failed to upsert ${stopType} stop.`);
   return stop;
+}
+
+async function lockLoadReservationWriteBoundary(db: MutationDb) {
+  await db.execute(sql`lock table load_reservations in share row exclusive mode`);
 }
 
 async function createDispatcherLoadWithDb(
@@ -260,10 +315,112 @@ async function createDispatcherLoadWithDb(
   };
 }
 
+function activeReservationPredicate(organizationId: string, loadId: string) {
+  return sql`not exists (
+    select 1
+    from load_reservations
+    where organization_id = ${organizationId}
+      and load_id = ${loadId}
+      and status = 'active'
+  )`;
+}
+
+async function getActiveReservation(db: MutationDb, organizationId: string, loadId: string) {
+  return (
+    await db
+      .select()
+      .from(loadReservations)
+      .where(
+        and(
+          eq(loadReservations.organizationId, organizationId),
+          eq(loadReservations.loadId, loadId),
+          eq(loadReservations.status, "active"),
+        ),
+      )
+      .limit(1)
+  )[0];
+}
+
+type StopSyncPlan = {
+  changed: boolean;
+  locationId: string;
+  appointmentStartsAt: Date | null;
+  appointmentEndsAt: Date | null;
+  stopType: "pickup" | "dropoff";
+  sequence: 1 | 2;
+};
+
+async function buildStopSyncPlan({
+  db,
+  organizationId,
+  input,
+  existingLoad,
+  existingStop,
+  locationInput,
+  startKey,
+  endKey,
+  loadStart,
+  loadEnd,
+  stopType,
+  sequence,
+}: {
+  db: MutationDb;
+  organizationId: string;
+  input: DispatcherEditLoadInput;
+  existingLoad: LoadRow;
+  existingStop: LoadStopRow | undefined;
+  locationInput: DispatcherLocationInput | undefined;
+  startKey: "pickupStartsAt" | "deliveryStartsAt";
+  endKey: "pickupEndsAt" | "deliveryEndsAt";
+  loadStart: Date | null;
+  loadEnd: Date | null;
+  stopType: "pickup" | "dropoff";
+  sequence: 1 | 2;
+}): Promise<StopSyncPlan | null> {
+  const shouldSync =
+    Boolean(locationInput) || hasOwn(input, startKey) || hasOwn(input, endKey);
+
+  if (!shouldSync) return null;
+
+  const resolvedLocation = locationInput
+    ? await resolveLocation({ db, organizationId, input: locationInput })
+    : null;
+  const locationId = resolvedLocation?.id ?? existingStop?.locationId;
+
+  if (!locationId) {
+    throw new Error(`Cannot synchronize ${stopType} stop without a location.`);
+  }
+
+  const appointmentStartsAt = hasOwn(input, startKey)
+    ? toDate(input[startKey])
+    : (existingStop?.appointmentStartsAt ?? loadStart);
+  const appointmentEndsAt = hasOwn(input, endKey)
+    ? toDate(input[endKey])
+    : (existingStop?.appointmentEndsAt ?? loadEnd);
+  const changed =
+    !existingStop ||
+    existingStop.locationId !== locationId ||
+    existingStop.stopType !== stopType ||
+    existingStop.sequence !== sequence ||
+    !datesEqual(existingStop.appointmentStartsAt, appointmentStartsAt) ||
+    !datesEqual(existingStop.appointmentEndsAt, appointmentEndsAt);
+
+  return {
+    changed,
+    locationId,
+    appointmentStartsAt,
+    appointmentEndsAt,
+    stopType,
+    sequence,
+  };
+}
+
 async function editDispatcherLoadWithDb(
   db: MutationDb,
   input: DispatcherEditLoadInput,
 ) {
+  await lockLoadReservationWriteBoundary(db);
+
   const existingLoad = (
     await db
       .select()
@@ -291,19 +448,11 @@ async function editDispatcherLoadWithDb(
     );
   }
 
-  const activeReservation = (
-    await db
-      .select()
-      .from(loadReservations)
-      .where(
-        and(
-          eq(loadReservations.organizationId, input.organizationId),
-          eq(loadReservations.loadId, input.loadId),
-          eq(loadReservations.status, "active"),
-        ),
-      )
-      .limit(1)
-  )[0];
+  const activeReservation = await getActiveReservation(
+    db,
+    input.organizationId,
+    input.loadId,
+  );
 
   if (activeReservation) {
     throw new DispatcherLoadDomainError(
@@ -312,67 +461,125 @@ async function editDispatcherLoadWithDb(
     );
   }
 
+  const existingStops = await db
+    .select()
+    .from(loadStops)
+    .where(
+      and(
+        eq(loadStops.organizationId, input.organizationId),
+        eq(loadStops.loadId, input.loadId),
+      ),
+    );
+  const existingPickupStop = existingStops.find((stop) => stop.sequence === 1);
+  const existingDropoffStop = existingStops.find((stop) => stop.sequence === 2);
+
   const fields = loadFields(input);
   const fieldsToSet = Object.fromEntries(
     Object.entries(fields).filter(([, value]) => value !== undefined),
   ) as LoadUpdate;
+  const loadHasChanges = Object.entries(fieldsToSet).some(
+    ([key, value]) => key !== "updatedAt" && loadFieldChanged(existingLoad, key, value),
+  );
+  const pickupStopPlan = await buildStopSyncPlan({
+    db,
+    organizationId: input.organizationId,
+    input,
+    existingLoad,
+    existingStop: existingPickupStop,
+    locationInput: input.pickupLocation,
+    startKey: "pickupStartsAt",
+    endKey: "pickupEndsAt",
+    loadStart: existingLoad.pickupStartsAt,
+    loadEnd: existingLoad.pickupEndsAt,
+    stopType: "pickup",
+    sequence: 1,
+  });
+  const dropoffStopPlan = await buildStopSyncPlan({
+    db,
+    organizationId: input.organizationId,
+    input,
+    existingLoad,
+    existingStop: existingDropoffStop,
+    locationInput: input.dropoffLocation,
+    startKey: "deliveryStartsAt",
+    endKey: "deliveryEndsAt",
+    loadStart: existingLoad.deliveryStartsAt,
+    loadEnd: existingLoad.deliveryEndsAt,
+    stopType: "dropoff",
+    sequence: 2,
+  });
 
-  if (Object.keys(fieldsToSet).length <= 1) {
+  if (!loadHasChanges && !pickupStopPlan?.changed && !dropoffStopPlan?.changed) {
     throw new DispatcherLoadDomainError(
       "LOAD_NO_CHANGES",
-      "No load fields were provided for edit.",
+      "No semantic load changes were provided for edit.",
     );
+  }
+
+  let pickupStopId: string | null = null;
+  let dropoffStopId: string | null = null;
+
+  if (pickupStopPlan?.changed) {
+    const pickupStop = await upsertLoadStop({
+      db,
+      organizationId: input.organizationId,
+      loadId: input.loadId,
+      locationId: pickupStopPlan.locationId,
+      stopType: pickupStopPlan.stopType,
+      sequence: pickupStopPlan.sequence,
+      appointmentStartsAt: pickupStopPlan.appointmentStartsAt,
+      appointmentEndsAt: pickupStopPlan.appointmentEndsAt,
+    });
+    pickupStopId = pickupStop.id;
+  }
+
+  if (dropoffStopPlan?.changed) {
+    const dropoffStop = await upsertLoadStop({
+      db,
+      organizationId: input.organizationId,
+      loadId: input.loadId,
+      locationId: dropoffStopPlan.locationId,
+      stopType: dropoffStopPlan.stopType,
+      sequence: dropoffStopPlan.sequence,
+      appointmentStartsAt: dropoffStopPlan.appointmentStartsAt,
+      appointmentEndsAt: dropoffStopPlan.appointmentEndsAt,
+    });
+    dropoffStopId = dropoffStop.id;
   }
 
   const updatedLoad = (
     await db
       .update(loads)
       .set(fieldsToSet)
-      .where(eq(loads.id, input.loadId))
+      .where(
+        and(
+          eq(loads.id, input.loadId),
+          eq(loads.organizationId, input.organizationId),
+          eq(loads.status, "available"),
+          activeReservationPredicate(input.organizationId, input.loadId),
+        ),
+      )
       .returning()
   )[0];
 
-  if (!updatedLoad) throw new Error("Failed to update dispatcher load.");
+  if (!updatedLoad) {
+    const latestReservation = await getActiveReservation(
+      db,
+      input.organizationId,
+      input.loadId,
+    );
 
-  let pickupStopId: string | null = null;
-  let dropoffStopId: string | null = null;
+    if (latestReservation) {
+      throw new DispatcherLoadDomainError(
+        "LOAD_NOT_EDITABLE_WHILE_RESERVED",
+        "Load cannot be edited while it has an active reservation.",
+      );
+    }
 
-  if (input.pickupLocation) {
-    const pickupLocation = await resolveLocation({
-      db,
-      organizationId: input.organizationId,
-      input: input.pickupLocation,
-    });
-    const pickupStop = await upsertLoadStop({
-      db,
-      organizationId: input.organizationId,
-      loadId: input.loadId,
-      locationId: pickupLocation.id,
-      stopType: "pickup",
-      sequence: 1,
-      appointmentStartsAt: input.pickupStartsAt,
-      appointmentEndsAt: input.pickupEndsAt,
-    });
-    pickupStopId = pickupStop.id;
-  }
-
-  if (input.dropoffLocation) {
-    const dropoffLocation = await resolveLocation({
-      db,
-      organizationId: input.organizationId,
-      input: input.dropoffLocation,
-    });
-    const dropoffStop = await upsertLoadStop({
-      db,
-      organizationId: input.organizationId,
-      loadId: input.loadId,
-      locationId: dropoffLocation.id,
-      stopType: "dropoff",
-      sequence: 2,
-      appointmentStartsAt: input.deliveryStartsAt,
-      appointmentEndsAt: input.deliveryEndsAt,
-    });
-    dropoffStopId = dropoffStop.id;
+    throw new DispatcherLoadDomainError(
+      "LOAD_NOT_EDITABLE_STATUS",
+      "Only available loads can be edited in Stage 1D-B.",
+    );
   }
 
   return {
