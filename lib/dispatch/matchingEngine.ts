@@ -1,6 +1,7 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client";
 import {
+  loadReservations,
   loadSuggestions,
   loadStops,
   loads,
@@ -9,12 +10,15 @@ import {
   vehicleLocationEvents,
   vehicles,
 } from "../db/schema";
+import { assertDevDispatcherDatabaseTarget } from "./devDatabaseGuard";
 
 const modelProvider = "arc-deterministic";
 const modelName = "stage-1b-mock-matcher";
 const modelVersion = "2026-06-04";
 
 type Db = ReturnType<typeof getDb>;
+type TransactionDb = Parameters<Parameters<Db["transaction"]>[0]>[0];
+type MutationDb = Db | TransactionDb;
 type VehicleRow = typeof vehicles.$inferSelect;
 type LoadRow = typeof loads.$inferSelect;
 type LocationRow = typeof locations.$inferSelect;
@@ -218,7 +222,7 @@ function snapshotLoad(load: LoadWithStops) {
   };
 }
 
-async function loadVehicleContexts(db: Db, organizationId: string) {
+async function loadVehicleContexts(db: MutationDb, organizationId: string) {
   const vehicleRows = await db
     .select()
     .from(vehicles)
@@ -252,12 +256,22 @@ async function loadVehicleContexts(db: Db, organizationId: string) {
   }));
 }
 
-async function loadAvailableLoads(db: Db, organizationId: string) {
+async function loadAvailableLoads(db: MutationDb, organizationId: string) {
   const loadRows = await db
     .select()
     .from(loads)
     .where(
-      and(eq(loads.organizationId, organizationId), eq(loads.status, "available")),
+      and(
+        eq(loads.organizationId, organizationId),
+        eq(loads.status, "available"),
+        sql`not exists (
+          select 1
+          from ${loadReservations}
+          where ${loadReservations.organizationId} = ${organizationId}
+            and ${loadReservations.loadId} = ${loads.id}
+            and ${loadReservations.status} = 'active'
+        )`,
+      ),
     );
 
   const stopRows = await db
@@ -296,107 +310,111 @@ export async function runMatchingEngine({
   requestedByUserId?: string;
   db?: Db;
 }): Promise<MatchingRunResult> {
-  const vehicleContexts = await loadVehicleContexts(db, organizationId);
-  const availableLoads = await loadAvailableLoads(db, organizationId);
+  assertDevDispatcherDatabaseTarget("run dispatcher matching");
 
-  const inputSnapshot = {
-    organizationId,
-    generatedAt: new Date().toISOString(),
-    vehicleStatuses: ["available", "available_soon"],
-    loadStatuses: ["available"],
-    vehicles: vehicleContexts.map(snapshotVehicle),
-    loads: availableLoads.map(snapshotLoad),
-  };
+  return db.transaction(async (tx) => {
+    const vehicleContexts = await loadVehicleContexts(tx, organizationId);
+    const availableLoads = await loadAvailableLoads(tx, organizationId);
 
-  const matchingRun = (
-    await db
-      .insert(matchingRuns)
-      .values({
-        organizationId,
-        requestedByUserId: requestedByUserId ?? null,
-        status: "running",
-        inputSnapshot,
-        modelProvider,
-        modelName,
-        modelVersion,
-        explanation:
-          "Stage 1B deterministic mock matching run. No external AI API was used.",
-        metadata: { stage: "1B" },
+    const inputSnapshot = {
+      organizationId,
+      generatedAt: new Date().toISOString(),
+      vehicleStatuses: ["available", "available_soon"],
+      loadStatuses: ["available"],
+      vehicles: vehicleContexts.map(snapshotVehicle),
+      loads: availableLoads.map(snapshotLoad),
+    };
+
+    const matchingRun = (
+      await tx
+        .insert(matchingRuns)
+        .values({
+          organizationId,
+          requestedByUserId: requestedByUserId ?? null,
+          status: "running",
+          inputSnapshot,
+          modelProvider,
+          modelName,
+          modelVersion,
+          explanation:
+            "Stage 1B deterministic mock matching run. No external AI API was used.",
+          metadata: { stage: "1B" },
+        })
+        .returning()
+    )[0];
+
+    if (!matchingRun) throw new Error("Failed to create matching run.");
+
+    const suggestionsToInsert = vehicleContexts.flatMap((vehicle) => {
+      return availableLoads
+        .map((load) => {
+          const score = scoreVehicleLoad(vehicle, load);
+          return score ? { vehicle, load, score } : null;
+        })
+        .filter((value): value is NonNullable<typeof value> => Boolean(value))
+        .sort((a, b) => b.score.scoreTotal - a.score.scoreTotal)
+        .slice(0, 3)
+        .map((candidate, index) => ({
+          organizationId,
+          matchingRunId: matchingRun.id,
+          loadId: candidate.load.id,
+          vehicleId: candidate.vehicle.id,
+          status: "suggested",
+          rank: index + 1,
+          scoreTotal: candidate.score.scoreTotal.toFixed(4),
+          scoreBreakdown: candidate.score.scoreBreakdown,
+          estimatedDeadheadMiles:
+            candidate.score.estimatedDeadheadMiles.toFixed(2),
+          estimatedProfit: candidate.score.estimatedProfit.toFixed(2),
+          explanation: candidate.score.explanation,
+          loadSnapshot: snapshotLoad(candidate.load),
+          vehicleSnapshot: snapshotVehicle(candidate.vehicle),
+          modelProvider,
+          modelName,
+          modelVersion,
+          outcome: "generated",
+          metadata: { stage: "1B" },
+        }));
+    });
+
+    const insertedSuggestions =
+      suggestionsToInsert.length > 0
+        ? await tx.insert(loadSuggestions).values(suggestionsToInsert).returning()
+        : [];
+
+    await tx
+      .update(matchingRuns)
+      .set({
+        status: "completed",
+        completedAt: new Date(),
+        updatedAt: new Date(),
+        metadata: {
+          stage: "1B",
+          vehiclesEvaluated: vehicleContexts.length,
+          loadsEvaluated: availableLoads.length,
+          suggestionsCreated: insertedSuggestions.length,
+        },
       })
-      .returning()
-  )[0];
+      .where(eq(matchingRuns.id, matchingRun.id));
 
-  if (!matchingRun) throw new Error("Failed to create matching run.");
-
-  const suggestionsToInsert = vehicleContexts.flatMap((vehicle) => {
-    return availableLoads
-      .map((load) => {
-        const score = scoreVehicleLoad(vehicle, load);
-        return score ? { vehicle, load, score } : null;
-      })
-      .filter((value): value is NonNullable<typeof value> => Boolean(value))
-      .sort((a, b) => b.score.scoreTotal - a.score.scoreTotal)
-      .slice(0, 3)
-      .map((candidate, index) => ({
-        organizationId,
-        matchingRunId: matchingRun.id,
-        loadId: candidate.load.id,
-        vehicleId: candidate.vehicle.id,
-        status: "suggested",
-        rank: index + 1,
-        scoreTotal: candidate.score.scoreTotal.toFixed(4),
-        scoreBreakdown: candidate.score.scoreBreakdown,
-        estimatedDeadheadMiles:
-          candidate.score.estimatedDeadheadMiles.toFixed(2),
-        estimatedProfit: candidate.score.estimatedProfit.toFixed(2),
-        explanation: candidate.score.explanation,
-        loadSnapshot: snapshotLoad(candidate.load),
-        vehicleSnapshot: snapshotVehicle(candidate.vehicle),
-        modelProvider,
-        modelName,
-        modelVersion,
-        outcome: "generated",
-        metadata: { stage: "1B" },
-      }));
+    return {
+      matchingRunId: matchingRun.id,
+      organizationId,
+      vehiclesEvaluated: vehicleContexts.length,
+      loadsEvaluated: availableLoads.length,
+      suggestionsCreated: insertedSuggestions.length,
+      suggestions: insertedSuggestions.map((suggestion) => ({
+        suggestionId: suggestion.id,
+        vehicleId: suggestion.vehicleId,
+        loadId: suggestion.loadId,
+        rank: suggestion.rank ?? 0,
+        scoreTotal: toNumber(suggestion.scoreTotal),
+        estimatedDeadheadMiles: toNumber(suggestion.estimatedDeadheadMiles),
+        estimatedProfit: toNumber(suggestion.estimatedProfit),
+        explanation: suggestion.explanation ?? "",
+      })),
+    };
   });
-
-  const insertedSuggestions =
-    suggestionsToInsert.length > 0
-      ? await db.insert(loadSuggestions).values(suggestionsToInsert).returning()
-      : [];
-
-  await db
-    .update(matchingRuns)
-    .set({
-      status: "completed",
-      completedAt: new Date(),
-      updatedAt: new Date(),
-      metadata: {
-        stage: "1B",
-        vehiclesEvaluated: vehicleContexts.length,
-        loadsEvaluated: availableLoads.length,
-        suggestionsCreated: insertedSuggestions.length,
-      },
-    })
-    .where(eq(matchingRuns.id, matchingRun.id));
-
-  return {
-    matchingRunId: matchingRun.id,
-    organizationId,
-    vehiclesEvaluated: vehicleContexts.length,
-    loadsEvaluated: availableLoads.length,
-    suggestionsCreated: insertedSuggestions.length,
-    suggestions: insertedSuggestions.map((suggestion) => ({
-      suggestionId: suggestion.id,
-      vehicleId: suggestion.vehicleId,
-      loadId: suggestion.loadId,
-      rank: suggestion.rank ?? 0,
-      scoreTotal: toNumber(suggestion.scoreTotal),
-      estimatedDeadheadMiles: toNumber(suggestion.estimatedDeadheadMiles),
-      estimatedProfit: toNumber(suggestion.estimatedProfit),
-      explanation: suggestion.explanation ?? "",
-    })),
-  };
 }
 
 export const matchingEngineMetadata = {
