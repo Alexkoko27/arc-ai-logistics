@@ -11,6 +11,8 @@ export type DispatcherMutationErrorCode =
   | "VEHICLE_NO_CHANGES"
   | "VEHICLE_DUPLICATE_UNIT_NUMBER"
   | "VEHICLE_INVALID_AVAILABILITY"
+  | "LOAD_RESERVATION_CONFLICT"
+  | "RESERVATION_NOT_FOUND"
   | "UNKNOWN_ERROR";
 
 export type DispatcherMutationActionResult = {
