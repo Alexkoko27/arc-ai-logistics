@@ -384,7 +384,6 @@ export const loadReservations = pgTable(
       .defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     releasedAt: timestamp("released_at", { withTimezone: true }),
-    convertedAt: timestamp("converted_at", { withTimezone: true }),
     metadata: jsonb("metadata"),
     ...timestamps(),
   },

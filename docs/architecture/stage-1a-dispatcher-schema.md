@@ -100,7 +100,6 @@ vehicles or at different times.
 - `active`
 - `expired`
 - `released`
-- `converted`
 - `cancelled`
 
 `deals.status`:

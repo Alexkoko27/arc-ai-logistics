@@ -278,7 +278,6 @@ CREATE TABLE IF NOT EXISTS load_reservations (
   reserved_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   released_at timestamptz,
-  converted_at timestamptz,
   metadata jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
