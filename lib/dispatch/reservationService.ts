@@ -13,6 +13,9 @@ type Db = ReturnType<typeof getDb>;
 type TransactionDb = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type MutationDb = Db | TransactionDb;
 type DateInput = string | Date | null | undefined;
+type LoadRow = typeof loads.$inferSelect;
+type LoadSuggestionRow = typeof loadSuggestions.$inferSelect;
+type VehicleRow = typeof vehicles.$inferSelect;
 
 type ReserveLoadInput = {
   organizationId: string;
@@ -40,6 +43,7 @@ const activeReservationConstraintNames = [
   "load_reservations_active_load_idx",
   "load_reservations_active_suggestion_idx",
 ];
+const reservableVehicleStatuses = ["available", "available_soon"];
 
 export type DispatcherReservationDomainErrorCode =
   | "LOAD_SUGGESTION_NOT_RESERVABLE"
@@ -77,6 +81,158 @@ function loadSuggestionNotReservable(message: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
+}
+
+function snapshotValue(snapshot: unknown, key: string) {
+  if (!isRecord(snapshot)) return null;
+  const value = snapshot[key];
+  if (value === null || value === undefined) return null;
+  return String(value);
+}
+
+function rowValue(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return null;
+  return String(value);
+}
+
+function snapshotDateValue(snapshot: unknown, key: string) {
+  const value = snapshotValue(snapshot, key);
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+function rowDateValue(value: Date | null | undefined) {
+  return value ? value.toISOString() : null;
+}
+
+function valuesChanged(snapshot: string | null, current: string | null) {
+  return snapshot !== current;
+}
+
+function numericValuesChanged(snapshot: string | null, current: string | null) {
+  if (snapshot === null || current === null) return snapshot !== current;
+
+  const snapshotNumber = Number(snapshot);
+  const currentNumber = Number(current);
+  if (!Number.isFinite(snapshotNumber) || !Number.isFinite(currentNumber)) {
+    return snapshot !== current;
+  }
+
+  return snapshotNumber !== currentNumber;
+}
+
+function assertSuggestionStillMatchesCurrentState({
+  suggestion,
+  load,
+  vehicle,
+}: {
+  suggestion: LoadSuggestionRow;
+  load: LoadRow;
+  vehicle: VehicleRow;
+}) {
+  if (!reservableVehicleStatuses.includes(vehicle.status)) {
+    throw loadSuggestionNotReservable(
+      "Load suggestion vehicle is no longer operationally reservable.",
+    );
+  }
+
+  if (
+    load.equipmentType &&
+    vehicle.equipmentType &&
+    load.equipmentType !== vehicle.equipmentType
+  ) {
+    throw loadSuggestionNotReservable(
+      "Load suggestion vehicle no longer matches the load equipment.",
+    );
+  }
+
+  const loadSnapshot = suggestion.loadSnapshot;
+  const vehicleSnapshot = suggestion.vehicleSnapshot;
+  const loadTextChecks: Array<[string, string | null, string | null]> = [
+    ["status", snapshotValue(loadSnapshot, "status"), rowValue(load.status)],
+    [
+      "equipmentType",
+      snapshotValue(loadSnapshot, "equipmentType"),
+      rowValue(load.equipmentType),
+    ],
+    ["cargoType", snapshotValue(loadSnapshot, "cargoType"), rowValue(load.cargoType)],
+    ["currency", snapshotValue(loadSnapshot, "currency"), rowValue(load.currency)],
+  ];
+  const loadNumericChecks: Array<[string, string | null, string | null]> = [
+    ["weightLbs", snapshotValue(loadSnapshot, "weightLbs"), rowValue(load.weightLbs)],
+    ["rateAmount", snapshotValue(loadSnapshot, "rateAmount"), rowValue(load.rateAmount)],
+    [
+      "distanceMiles",
+      snapshotValue(loadSnapshot, "distanceMiles"),
+      rowValue(load.distanceMiles),
+    ],
+  ];
+  const loadDateChecks: Array<[string, string | null, string | null]> = [
+    [
+      "pickupStartsAt",
+      snapshotDateValue(loadSnapshot, "pickupStartsAt"),
+      rowDateValue(load.pickupStartsAt),
+    ],
+    [
+      "pickupEndsAt",
+      snapshotDateValue(loadSnapshot, "pickupEndsAt"),
+      rowDateValue(load.pickupEndsAt),
+    ],
+    [
+      "deliveryStartsAt",
+      snapshotDateValue(loadSnapshot, "deliveryStartsAt"),
+      rowDateValue(load.deliveryStartsAt),
+    ],
+    [
+      "deliveryEndsAt",
+      snapshotDateValue(loadSnapshot, "deliveryEndsAt"),
+      rowDateValue(load.deliveryEndsAt),
+    ],
+  ];
+
+  if (loadTextChecks.some(([, snapshot, current]) => valuesChanged(snapshot, current))) {
+    throw loadSuggestionNotReservable(
+      "Load suggestion is stale because the load changed after matching.",
+    );
+  }
+
+  if (
+    loadNumericChecks.some(([, snapshot, current]) =>
+      numericValuesChanged(snapshot, current),
+    )
+  ) {
+    throw loadSuggestionNotReservable(
+      "Load suggestion is stale because the load changed after matching.",
+    );
+  }
+
+  if (loadDateChecks.some(([, snapshot, current]) => valuesChanged(snapshot, current))) {
+    throw loadSuggestionNotReservable(
+      "Load suggestion is stale because the load timing changed after matching.",
+    );
+  }
+
+  const vehicleChecks: Array<[string, string | null, string | null]> = [
+    [
+      "equipmentType",
+      snapshotValue(vehicleSnapshot, "equipmentType"),
+      rowValue(vehicle.equipmentType),
+    ],
+    ["status", snapshotValue(vehicleSnapshot, "status"), rowValue(vehicle.status)],
+    [
+      "expectedAvailableAt",
+      snapshotDateValue(vehicleSnapshot, "expectedAvailableAt"),
+      rowDateValue(vehicle.expectedAvailableAt),
+    ],
+  ];
+
+  if (vehicleChecks.some(([, snapshot, current]) => valuesChanged(snapshot, current))) {
+    throw loadSuggestionNotReservable(
+      "Load suggestion is stale because the vehicle changed after matching.",
+    );
+  }
 }
 
 function isActiveReservationConflict(error: unknown) {
@@ -315,12 +471,24 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
   }
 
   const resolvedVehicleId = suggestion.vehicleId;
+  const vehicle = (
+    await db
+      .select()
+      .from(vehicles)
+      .where(
+        and(
+          eq(vehicles.id, resolvedVehicleId),
+          eq(vehicles.organizationId, input.organizationId),
+        ),
+      )
+      .limit(1)
+  )[0];
 
-  await assertVehicleBelongsToOrganization(
-    db,
-    input.organizationId,
-    resolvedVehicleId,
-  );
+  if (!vehicle) {
+    throw new Error(`Vehicle ${resolvedVehicleId} was not found for this organization.`);
+  }
+
+  assertSuggestionStillMatchesCurrentState({ suggestion, load, vehicle });
 
   if (input.driverId) {
     await assertDriverBelongsToOrganization(db, input.organizationId, input.driverId);
