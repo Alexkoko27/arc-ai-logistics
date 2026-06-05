@@ -38,7 +38,8 @@ export type DispatcherLoadDomainErrorCode =
   | "LOAD_NOT_FOUND"
   | "LOAD_NOT_EDITABLE_STATUS"
   | "LOAD_NOT_EDITABLE_WHILE_RESERVED"
-  | "LOAD_NO_CHANGES";
+  | "LOAD_NO_CHANGES"
+  | "LOAD_INVALID_TIMING";
 
 export class DispatcherLoadDomainError extends Error {
   constructor(
@@ -130,6 +131,65 @@ function loadFieldChanged(
     existingLoad[key as keyof LoadRow],
     value,
   );
+}
+
+function effectiveDate(
+  input: DispatcherEditLoadInput,
+  key:
+    | "pickupStartsAt"
+    | "pickupEndsAt"
+    | "deliveryStartsAt"
+    | "deliveryEndsAt",
+  fallback: Date | null,
+) {
+  return hasOwn(input, key) ? toDate(input[key]) : fallback;
+}
+
+function assertEffectiveLoadTiming(
+  existingLoad: LoadRow,
+  input: DispatcherEditLoadInput,
+) {
+  const pickupStartsAt = effectiveDate(
+    input,
+    "pickupStartsAt",
+    existingLoad.pickupStartsAt,
+  );
+  const pickupEndsAt = effectiveDate(
+    input,
+    "pickupEndsAt",
+    existingLoad.pickupEndsAt,
+  );
+  const deliveryStartsAt = effectiveDate(
+    input,
+    "deliveryStartsAt",
+    existingLoad.deliveryStartsAt,
+  );
+  const deliveryEndsAt = effectiveDate(
+    input,
+    "deliveryEndsAt",
+    existingLoad.deliveryEndsAt,
+  );
+
+  if (pickupStartsAt && pickupEndsAt && pickupStartsAt > pickupEndsAt) {
+    throw new DispatcherLoadDomainError(
+      "LOAD_INVALID_TIMING",
+      "Pickup end must be after pickup start.",
+    );
+  }
+
+  if (deliveryStartsAt && deliveryEndsAt && deliveryStartsAt > deliveryEndsAt) {
+    throw new DispatcherLoadDomainError(
+      "LOAD_INVALID_TIMING",
+      "Delivery end must be after delivery start.",
+    );
+  }
+
+  if (pickupEndsAt && deliveryStartsAt && pickupEndsAt > deliveryStartsAt) {
+    throw new DispatcherLoadDomainError(
+      "LOAD_INVALID_TIMING",
+      "Delivery must start after pickup is complete.",
+    );
+  }
 }
 
 function locationFields(
@@ -458,6 +518,8 @@ async function editDispatcherLoadWithDb(
       "Load cannot be edited while it has an active reservation.",
     );
   }
+
+  assertEffectiveLoadTiming(existingLoad, input);
 
   const existingStops = await db
     .select()
