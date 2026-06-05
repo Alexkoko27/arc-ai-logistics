@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   releaseDispatcherReservationAction,
@@ -53,6 +53,7 @@ export default function ReservationActionPanel({
   activeReservations: ReservationActionActiveReservation[];
 }) {
   const router = useRouter();
+  const submitLockRef = useRef(false);
   const [selectedSuggestionId, setSelectedSuggestionId] = useState("");
   const [selectedReservationId, setSelectedReservationId] = useState("");
   const [result, setResult] = useState<DispatcherMutationActionResult | null>(
@@ -81,8 +82,9 @@ export default function ReservationActionPanel({
   const resultDetails = fieldErrorMessages(result);
 
   function submitReserve() {
-    if (!selectedSuggestion || isMutating) return;
+    if (!selectedSuggestion || isMutating || submitLockRef.current) return;
 
+    submitLockRef.current = true;
     setResult(null);
     setActiveOperation("reserve");
     startTransition(async () => {
@@ -99,14 +101,16 @@ export default function ReservationActionPanel({
           router.refresh();
         }
       } finally {
+        submitLockRef.current = false;
         setActiveOperation(null);
       }
     });
   }
 
   function submitRelease() {
-    if (!selectedReservation || isMutating) return;
+    if (!selectedReservation || isMutating || submitLockRef.current) return;
 
+    submitLockRef.current = true;
     setResult(null);
     setActiveOperation("release");
     startTransition(async () => {
@@ -122,6 +126,7 @@ export default function ReservationActionPanel({
           router.refresh();
         }
       } finally {
+        submitLockRef.current = false;
         setActiveOperation(null);
       }
     });
@@ -135,7 +140,7 @@ export default function ReservationActionPanel({
             Reservation Actions
           </h2>
           <p className="mt-1 text-sm leading-6 text-violet-800">
-            Stage 1D-D-B creates and releases only temporary operational holds on
+            Stage 1D-D creates and releases only temporary operational holds on
             loads. Deal, shipment, dispatch, driver assignment, settlement, and
             payment flows are intentionally excluded.
           </p>
