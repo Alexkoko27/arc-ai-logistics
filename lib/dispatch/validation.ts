@@ -10,26 +10,28 @@ const optionalTextSchema = z.preprocess(
   emptyToUndefined,
   z.string().trim().max(500).optional(),
 );
-const moneySchema = z
-  .preprocess(
-    emptyToUndefined,
-    z
-      .string()
-      .trim()
-      .regex(/^\d+(\.\d{1,2})?$/, "Expected a positive decimal amount.")
-      .refine((value) => Number(value) > 0, "Expected a positive amount.")
-      .optional(),
-  );
-const mileageSchema = z
-  .preprocess(
-    emptyToUndefined,
-    z
-      .string()
-      .trim()
-      .regex(/^\d+(\.\d{1,2})?$/, "Expected positive mileage.")
-      .refine((value) => Number(value) > 0, "Expected positive mileage.")
-      .optional(),
-  );
+const positiveIntegerSchema = z.preprocess(
+  emptyToUndefined,
+  z.coerce.number().int().positive().optional(),
+);
+const moneySchema = z.preprocess(
+  emptyToUndefined,
+  z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d{1,2})?$/, "Expected a positive decimal amount.")
+    .refine((value) => Number(value) > 0, "Expected a positive amount.")
+    .optional(),
+);
+const mileageSchema = z.preprocess(
+  emptyToUndefined,
+  z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d{1,2})?$/, "Expected positive mileage.")
+    .refine((value) => Number(value) > 0, "Expected positive mileage.")
+    .optional(),
+);
 const isoDateSchema = z.preprocess(
   emptyToUndefined,
   z.string().datetime().optional(),
@@ -97,14 +99,14 @@ function validateLoadTiming(
   }
 
   if (
-    pickupStartsAt !== null &&
+    pickupEndsAt !== null &&
     deliveryStartsAt !== null &&
-    pickupStartsAt > deliveryStartsAt
+    pickupEndsAt > deliveryStartsAt
   ) {
     ctx.addIssue({
       code: "custom",
       path: ["deliveryStartsAt"],
-      message: "Delivery must start after pickup starts.",
+      message: "Delivery must start after pickup is complete.",
     });
   }
 }
@@ -115,7 +117,7 @@ const dispatcherLoadMutationFields = z.object({
   referenceNumber: optionalTextSchema,
   equipmentType: z.string().trim().min(1).max(80),
   cargoType: optionalTextSchema,
-  weightLbs: z.coerce.number().int().positive().optional(),
+  weightLbs: positiveIntegerSchema,
   rateAmount: moneySchema,
   currency: z
     .string()
