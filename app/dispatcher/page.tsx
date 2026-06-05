@@ -2,6 +2,10 @@ import Link from "next/link";
 import LoadMutationPanel, {
   type LoadMutationPanelLoad,
 } from "@/components/dispatcher/LoadMutationPanel";
+import ReservationActionPanel, {
+  type ReservationActionActiveReservation,
+  type ReservationActionSuggestion,
+} from "@/components/dispatcher/ReservationActionPanel";
 import VehicleMutationPanel, {
   type VehicleMutationPanelVehicle,
 } from "@/components/dispatcher/VehicleMutationPanel";
@@ -382,6 +386,31 @@ export default async function DispatcherCockpitPage() {
         dropoffState: dropoff?.location?.state ?? "",
       };
     });
+  const reservationSuggestions: ReservationActionSuggestion[] = data.suggestions.map(
+    (suggestion) => ({
+      suggestionId: suggestion.row.id,
+      loadId: suggestion.row.loadId,
+      vehicleId: suggestion.row.vehicleId,
+      label: [
+        suggestion.vehicle?.unitNumber ?? "Vehicle",
+        suggestion.load?.referenceNumber ?? suggestion.load?.externalId ?? "load",
+      ].join(" for "),
+      scoreLabel: suggestion.row.scoreTotal
+        ? `(score ${formatScore(suggestion.row.scoreTotal)})`
+        : "",
+      isReservable:
+        suggestion.row.status === "suggested" &&
+        suggestion.load?.status === "available" &&
+        !suggestion.activeReservation,
+    }),
+  );
+  const activeReservations: ReservationActionActiveReservation[] = data.loads
+    .filter((load) => load.activeReservation)
+    .map((load) => ({
+      reservationId: load.activeReservation?.id ?? "",
+      label: load.referenceNumber ?? load.externalId ?? load.id,
+      expiresAt: formatDate(load.activeReservation?.expiresAt ?? null),
+    }));
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -412,6 +441,14 @@ export default async function DispatcherCockpitPage() {
           </Link>
         </div>
       </header>
+
+      {data.organization ? (
+        <ReservationActionPanel
+          organizationId={data.organization.id}
+          suggestions={reservationSuggestions}
+          activeReservations={activeReservations}
+        />
+      ) : null}
 
       {data.organization ? (
         <VehicleMutationPanel
