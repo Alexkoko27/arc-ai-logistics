@@ -14,8 +14,8 @@ export type ReservationActionSuggestion = {
   vehicleId: string;
   label: string;
   scoreLabel: string;
-  status: string;
-  loadStatus: string;
+  status?: string;
+  loadStatus?: string;
   isReservable: boolean;
 };
 
@@ -23,7 +23,7 @@ export type ReservationActionActiveReservation = {
   reservationId: string;
   label: string;
   expiresAt: string;
-  status: string;
+  status?: string;
 };
 
 type ActiveOperation = "reserve" | "release" | null;
@@ -212,11 +212,16 @@ export default function ReservationActionPanel({
           {selectedSuggestion ? (
             <div className="rounded-md border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
               <p>
-                Load status: <span className="font-semibold">{selectedSuggestion.loadStatus}</span>
+                Load status:{" "}
+                <span className="font-semibold">
+                  {selectedSuggestion.loadStatus ?? "available"}
+                </span>
               </p>
               <p className="mt-1">
                 Suggestion status:{" "}
-                <span className="font-semibold">{selectedSuggestion.status}</span>
+                <span className="font-semibold">
+                  {selectedSuggestion.status ?? "suggested"}
+                </span>
               </p>
             </div>
           ) : null}
@@ -262,7 +267,9 @@ export default function ReservationActionPanel({
             <div className="rounded-md border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
               <p>
                 Reservation status:{" "}
-                <span className="font-semibold">{selectedReservation.status}</span>
+                <span className="font-semibold">
+                  {selectedReservation.status ?? "active"}
+                </span>
               </p>
               <p className="mt-1">
                 Expires: <span className="font-semibold">{selectedReservation.expiresAt}</span>
