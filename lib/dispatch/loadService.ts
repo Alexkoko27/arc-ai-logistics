@@ -6,6 +6,7 @@ import {
   loads,
   locations,
 } from "../db/schema";
+import { assertDevDispatcherDatabaseTarget } from "./devDatabaseGuard";
 import type {
   DispatcherCreateLoadInput,
   DispatcherEditLoadInput,
@@ -651,6 +652,8 @@ export async function createDispatcherLoad(
   input: DispatcherCreateLoadInput,
   db: Db = getDb(),
 ): Promise<DispatcherLoadMutationResult> {
+  assertDevDispatcherDatabaseTarget("create dispatcher load");
+
   return db.transaction((tx) => createDispatcherLoadWithDb(tx, input));
 }
 
@@ -658,5 +661,7 @@ export async function editDispatcherLoad(
   input: DispatcherEditLoadInput,
   db: Db = getDb(),
 ): Promise<DispatcherLoadMutationResult> {
+  assertDevDispatcherDatabaseTarget("edit dispatcher load");
+
   return db.transaction((tx) => editDispatcherLoadWithDb(tx, input));
 }
