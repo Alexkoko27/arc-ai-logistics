@@ -100,10 +100,15 @@ function loadStopLabel(load: DispatcherLoadView, stopType: "pickup" | "dropoff")
   return locationLabel(stop.location);
 }
 
-function loadReadiness(
-  load: DispatcherLoadView,
-  matchingIsStale: boolean,
-): OperationalReadiness<LoadReadinessStatus> {
+function loadReadiness({
+  load,
+  matchingIsReady,
+  hasReservableSuggestion,
+}: {
+  load: DispatcherLoadView;
+  matchingIsReady: boolean;
+  hasReservableSuggestion: boolean;
+}): OperationalReadiness<LoadReadinessStatus> {
   if (load.activeReservation) {
     return {
       status: "reserved",
@@ -118,27 +123,34 @@ function loadReadiness(
     };
   }
 
-  if (matchingIsStale) {
+  if (!matchingIsReady) {
     return {
       status: "stale",
-      reason: "Latest matching run is stale for reservation selection.",
+      reason: "Fresh matching context is required for reservation selection.",
+    };
+  }
+
+  if (!hasReservableSuggestion) {
+    return {
+      status: "unavailable",
+      reason: "No current reservable load suggestion is available.",
     };
   }
 
   return {
     status: "reservable",
-    reason: "Available load with no active hold and fresh matching context.",
+    reason: "Available load with a fresh reservable suggestion and no active hold.",
   };
 }
 
 function vehicleReadiness({
   vehicle,
   hasActiveReservation,
-  matchingIsStale,
+  matchingIsReady,
 }: {
   vehicle: DispatcherVehicleView;
   hasActiveReservation: boolean;
-  matchingIsStale: boolean;
+  matchingIsReady: boolean;
 }): OperationalReadiness<VehicleReadinessStatus> {
   if (hasActiveReservation) {
     return {
@@ -154,10 +166,10 @@ function vehicleReadiness({
     };
   }
 
-  if (matchingIsStale) {
+  if (!matchingIsReady) {
     return {
       status: "stale_matching_context",
-      reason: "Latest matching run is stale for reservation selection.",
+      reason: "Fresh matching context is required for reservation selection.",
     };
   }
 
@@ -334,11 +346,13 @@ function ReservationState({
 function LoadTable({
   loads,
   now,
-  matchingIsStale,
+  matchingIsReady,
+  reservableLoadIds,
 }: {
   loads: DispatcherLoadView[];
   now: Date;
-  matchingIsStale: boolean;
+  matchingIsReady: boolean;
+  reservableLoadIds: Set<string>;
 }) {
   if (loads.length === 0) {
     return <EmptyState label="No loads found for this organization." />;
@@ -359,7 +373,11 @@ function LoadTable({
         </thead>
         <tbody className="divide-y divide-gray-100">
           {loads.map((load) => {
-            const readiness = loadReadiness(load, matchingIsStale);
+            const readiness = loadReadiness({
+              load,
+              matchingIsReady,
+              hasReservableSuggestion: reservableLoadIds.has(load.id),
+            });
 
             return (
               <tr key={load.id} className="align-top">
@@ -588,12 +606,12 @@ function ReservationActivitySection({
 
 function staleReasonForSuggestion({
   suggestion,
-  matchingIsStale,
+  matchingIsReady,
 }: {
   suggestion: DispatcherSuggestionView;
-  matchingIsStale: boolean;
+  matchingIsReady: boolean;
 }) {
-  if (matchingIsStale) return "matching run is stale";
+  if (!matchingIsReady) return "matching context is stale or unavailable";
   if (suggestion.row.status !== "suggested") return `suggestion is ${suggestion.row.status}`;
   if (suggestion.load?.status !== "available") {
     return `load is ${suggestion.load?.status ?? "unavailable"}`;
@@ -612,6 +630,7 @@ export default async function DispatcherCockpitPage() {
   const matchingIsStale =
     matchingAgeMs !== null &&
     matchingAgeMs > MATCHING_STALE_AFTER_MINUTES * MINUTE_MS;
+  const matchingIsReady = latestRun !== null && !matchingIsStale;
   const matchingFreshness = latestRun
     ? {
         generatedAtLabel: formatDate(latestRun.row.createdAt),
@@ -627,14 +646,50 @@ export default async function DispatcherCockpitPage() {
       )
       .map((reservation) => [reservation.vehicleId, reservation]),
   );
+  const reservationSuggestions: ReservationActionSuggestion[] = data.suggestions.map(
+    (suggestion) => {
+      const staleReason = staleReasonForSuggestion({ suggestion, matchingIsReady });
+
+      return {
+        suggestionId: suggestion.row.id,
+        loadId: suggestion.row.loadId,
+        vehicleId: suggestion.row.vehicleId,
+        label: [
+          suggestion.vehicle?.unitNumber ?? "Vehicle",
+          suggestion.load?.referenceNumber ?? suggestion.load?.externalId ?? "load",
+        ].join(" for "),
+        scoreLabel: suggestion.row.scoreTotal
+          ? `(score ${formatScore(suggestion.row.scoreTotal)})`
+          : "",
+        status: suggestion.row.status,
+        loadStatus: suggestion.load?.status ?? "unknown",
+        isReservable: staleReason === null,
+        isStale: staleReason !== null,
+        staleReason: staleReason ?? undefined,
+      };
+    },
+  );
+  const reservableSuggestionCount = reservationSuggestions.filter(
+    (suggestion) => suggestion.isReservable,
+  ).length;
+  const staleSuggestionCount = reservationSuggestions.length - reservableSuggestionCount;
+  const reservableLoadIds = new Set(
+    reservationSuggestions
+      .filter((suggestion) => suggestion.isReservable)
+      .map((suggestion) => suggestion.loadId),
+  );
   const loadReadinessItems = data.loads.map((load) =>
-    loadReadiness(load, matchingIsStale),
+    loadReadiness({
+      load,
+      matchingIsReady,
+      hasReservableSuggestion: reservableLoadIds.has(load.id),
+    }),
   );
   const vehicleReadinessItems = data.vehicles.map((vehicle) =>
     vehicleReadiness({
       vehicle,
       hasActiveReservation: activeReservationByVehicleId.has(vehicle.id),
-      matchingIsStale,
+      matchingIsReady,
     }),
   );
   const readyLoadCount = loadReadinessItems.filter(
@@ -683,29 +738,6 @@ export default async function DispatcherCockpitPage() {
         dropoffState: dropoff?.location?.state ?? "",
       };
     });
-  const reservationSuggestions: ReservationActionSuggestion[] = data.suggestions.map(
-    (suggestion) => {
-      const staleReason = staleReasonForSuggestion({ suggestion, matchingIsStale });
-
-      return {
-        suggestionId: suggestion.row.id,
-        loadId: suggestion.row.loadId,
-        vehicleId: suggestion.row.vehicleId,
-        label: [
-          suggestion.vehicle?.unitNumber ?? "Vehicle",
-          suggestion.load?.referenceNumber ?? suggestion.load?.externalId ?? "load",
-        ].join(" for "),
-        scoreLabel: suggestion.row.scoreTotal
-          ? `(score ${formatScore(suggestion.row.scoreTotal)})`
-          : "",
-        status: suggestion.row.status,
-        loadStatus: suggestion.load?.status ?? "unknown",
-        isReservable: staleReason === null,
-        isStale: staleReason !== null,
-        staleReason: staleReason ?? undefined,
-      };
-    },
-  );
   const activeReservations: ReservationActionActiveReservation[] = data.loads
     .filter((load) => load.activeReservation)
     .map((load) => {
@@ -726,10 +758,6 @@ export default async function DispatcherCockpitPage() {
         isStale: remainingMs <= HOLD_STALE_REMAINING_MINUTES * MINUTE_MS,
       };
     });
-  const reservableSuggestionCount = reservationSuggestions.filter(
-    (suggestion) => suggestion.isReservable,
-  ).length;
-  const staleSuggestionCount = reservationSuggestions.length - reservableSuggestionCount;
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -834,12 +862,12 @@ export default async function DispatcherCockpitPage() {
             <MetricCard
               label="Ready loads"
               value={readyLoadCount}
-              description="Reservable only with fresh matching and no active hold."
+              description="Reservable only with a current fresh suggestion."
             />
             <MetricCard
               label="Blocked loads"
               value={blockedLoadCount}
-              description="Reserved, stale, or unavailable market opportunities."
+              description="Reserved, stale, unavailable, or missing a suggestion."
             />
             <MetricCard
               label="Ready vehicles"
@@ -887,7 +915,7 @@ export default async function DispatcherCockpitPage() {
                     readiness={vehicleReadiness({
                       vehicle,
                       hasActiveReservation: activeReservationByVehicleId.has(vehicle.id),
-                      matchingIsStale,
+                      matchingIsReady,
                     })}
                   />
                 ))}
@@ -900,9 +928,14 @@ export default async function DispatcherCockpitPage() {
           <section className="space-y-3">
             <SectionHeader
               title="Loads"
-              description="Loads are market opportunities. Readiness is derived from load state, active holds, and matching freshness."
+              description="Loads are market opportunities. Readiness is derived from load state, active holds, matching freshness, and current suggestions."
             />
-            <LoadTable loads={data.loads} now={now} matchingIsStale={matchingIsStale} />
+            <LoadTable
+              loads={data.loads}
+              now={now}
+              matchingIsReady={matchingIsReady}
+              reservableLoadIds={reservableLoadIds}
+            />
           </section>
 
           <section className="space-y-3">
@@ -986,7 +1019,7 @@ export default async function DispatcherCockpitPage() {
                   <SuggestionCard
                     key={suggestion.row.id}
                     suggestion={suggestion}
-                    matchingIsStale={matchingIsStale}
+                    matchingIsStale={!matchingIsReady}
                   />
                 ))}
               </div>
