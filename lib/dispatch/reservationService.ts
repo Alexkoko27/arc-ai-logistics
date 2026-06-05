@@ -362,24 +362,6 @@ async function findActiveReservationForSuggestion(
   )[0];
 }
 
-async function assertVehicleBelongsToOrganization(
-  db: MutationDb,
-  organizationId: string,
-  vehicleId: string,
-) {
-  const vehicle = (
-    await db
-      .select({ id: vehicles.id })
-      .from(vehicles)
-      .where(and(eq(vehicles.id, vehicleId), eq(vehicles.organizationId, organizationId)))
-      .limit(1)
-  )[0];
-
-  if (!vehicle) {
-    throw new Error(`Vehicle ${vehicleId} was not found for this organization.`);
-  }
-}
-
 async function assertDriverBelongsToOrganization(
   db: MutationDb,
   organizationId: string,
