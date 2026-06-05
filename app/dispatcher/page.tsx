@@ -11,6 +11,7 @@ import VehicleMutationPanel, {
 } from "@/components/dispatcher/VehicleMutationPanel";
 import {
   type DispatcherLoadView,
+  type DispatcherReservationActivityItem,
   type DispatcherSuggestionView,
   type DispatcherVehicleView,
   getDispatcherCockpitData,
@@ -404,6 +405,77 @@ function SuggestionCard({
   );
 }
 
+function ReservationActivityList({
+  title,
+  items,
+}: {
+  title: string;
+  items: DispatcherReservationActivityItem[];
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <h3 className="font-bold text-gray-950">{title}</h3>
+      {items.length > 0 ? (
+        <div className="mt-3 space-y-3">
+          {items.map((item) => (
+            <article key={item.reservationId} className="rounded-md bg-gray-50 p-3 text-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="font-semibold text-gray-950">{item.loadReference}</p>
+                  <p className="mt-1 font-mono text-xs text-gray-500">
+                    {item.suggestionReference}
+                  </p>
+                </div>
+                <StatusBadge status={item.status} />
+              </div>
+              <dl className="mt-3 grid gap-2 text-xs text-gray-600 sm:grid-cols-3">
+                <div>
+                  <dt className="font-semibold text-gray-700">Created</dt>
+                  <dd className="mt-1">{formatDate(item.createdAt)}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-gray-700">Updated</dt>
+                  <dd className="mt-1">{formatDate(item.updatedAt)}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-gray-700">Released/expired</dt>
+                  <dd className="mt-1">{formatDate(item.releasedAt)}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-gray-500">No recent records.</p>
+      )}
+    </div>
+  );
+}
+
+function ReservationActivitySection({
+  activity,
+}: {
+  activity: {
+    active: DispatcherReservationActivityItem[];
+    released: DispatcherReservationActivityItem[];
+    expired: DispatcherReservationActivityItem[];
+  };
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader
+        title="Reservation Activity"
+        description="Read-only lifecycle visibility for temporary operational holds. Released and expired records are history only."
+      />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <ReservationActivityList title="Recent Active" items={activity.active} />
+        <ReservationActivityList title="Recent Released" items={activity.released} />
+        <ReservationActivityList title="Recent Expired" items={activity.expired} />
+      </div>
+    </section>
+  );
+}
+
 function staleReasonForSuggestion({
   suggestion,
   matchingIsStale,
@@ -565,6 +637,10 @@ export default async function DispatcherCockpitPage() {
           activeReservations={activeReservations}
           matchingFreshness={matchingFreshness}
         />
+      ) : null}
+
+      {data.organization ? (
+        <ReservationActivitySection activity={data.reservationActivity} />
       ) : null}
 
       {data.organization ? (
