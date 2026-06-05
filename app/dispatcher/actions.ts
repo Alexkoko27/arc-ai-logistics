@@ -17,6 +17,12 @@ import {
   assertDispatcherMutationAllowed,
 } from "@/lib/dispatch/mutationGuard";
 import {
+  ActiveLoadReservationConflictError,
+  DispatcherReservationDomainError,
+  releaseLoadReservation,
+  reserveLoad,
+} from "@/lib/dispatch/reservationService";
+import {
   DispatcherVehicleDomainError,
   createDispatcherVehicle,
   editDispatcherVehicle,
@@ -29,18 +35,6 @@ import {
   dispatcherReleaseReservationSchema,
   dispatcherReserveLoadSchema,
 } from "@/lib/dispatch/validation";
-import {
-  describeWorkflowMutationBoundary,
-} from "@/lib/dispatch/workflowService";
-
-function foundationOnlyResult(
-  message: string,
-): DispatcherMutationActionResult {
-  return dispatcherActionFailure({
-    code: "STAGE_1D_A_FOUNDATION_ONLY",
-    message,
-  });
-}
 
 function validationFailure(error: z.ZodError): DispatcherMutationActionResult {
   const fieldErrors = Object.fromEntries(
@@ -54,45 +48,6 @@ function validationFailure(error: z.ZodError): DispatcherMutationActionResult {
     message: "Dispatcher mutation input is invalid.",
     fieldErrors,
   });
-}
-
-function guardedAction<TInput>({
-  context,
-  input,
-  schema,
-  describeBoundary,
-  foundationMessage,
-}: {
-  context: string;
-  input: unknown;
-  schema: z.ZodType<TInput>;
-  describeBoundary: (input: TInput) => unknown;
-  foundationMessage: string;
-}): DispatcherMutationActionResult {
-  try {
-    assertDispatcherMutationAllowed(context);
-
-    const parsedInput = schema.parse(input);
-    describeBoundary(parsedInput);
-
-    return foundationOnlyResult(foundationMessage);
-  } catch (error) {
-    if (error instanceof DispatcherMutationBlockedError) {
-      return dispatcherActionFailure({
-        code: "DISPATCHER_MUTATION_BLOCKED",
-        message: error.message,
-      });
-    }
-
-    if (error instanceof z.ZodError) {
-      return validationFailure(error);
-    }
-
-    return dispatcherActionFailure({
-      code: "UNKNOWN_ERROR",
-      message: "Dispatcher mutation failed before persistence.",
-    });
-  }
 }
 
 function loadMutationFailure(error: unknown): DispatcherMutationActionResult {
@@ -142,6 +97,38 @@ function vehicleMutationFailure(error: unknown): DispatcherMutationActionResult 
   return dispatcherActionFailure({
     code: "UNKNOWN_ERROR",
     message: "Dispatcher vehicle mutation failed.",
+  });
+}
+
+function reservationMutationFailure(error: unknown): DispatcherMutationActionResult {
+  if (error instanceof DispatcherMutationBlockedError) {
+    return dispatcherActionFailure({
+      code: "DISPATCHER_MUTATION_BLOCKED",
+      message: error.message,
+    });
+  }
+
+  if (error instanceof z.ZodError) {
+    return validationFailure(error);
+  }
+
+  if (error instanceof ActiveLoadReservationConflictError) {
+    return dispatcherActionFailure({
+      code: "LOAD_RESERVATION_CONFLICT",
+      message: error.message,
+    });
+  }
+
+  if (error instanceof DispatcherReservationDomainError) {
+    return dispatcherActionFailure({
+      code: error.code,
+      message: error.message,
+    });
+  }
+
+  return dispatcherActionFailure({
+    code: "UNKNOWN_ERROR",
+    message: "Dispatcher reservation mutation failed.",
   });
 }
 
@@ -208,25 +195,29 @@ export async function editDispatcherVehicleAction(
 export async function reserveDispatcherLoadAction(
   input: unknown,
 ): Promise<DispatcherMutationActionResult> {
-  return guardedAction({
-    context: "reserve dispatcher load",
-    input,
-    schema: dispatcherReserveLoadSchema,
-    describeBoundary: describeWorkflowMutationBoundary,
-    foundationMessage:
-      "Load reservation is validated but not executed in Stage 1D-A.",
-  });
+  try {
+    assertDispatcherMutationAllowed("reserve dispatcher load");
+    const parsedInput = dispatcherReserveLoadSchema.parse(input);
+    const reservation = await reserveLoad(parsedInput);
+    revalidatePath("/dispatcher");
+
+    return dispatcherActionSuccess(`Reservation ${reservation.id} created.`);
+  } catch (error) {
+    return reservationMutationFailure(error);
+  }
 }
 
 export async function releaseDispatcherReservationAction(
   input: unknown,
 ): Promise<DispatcherMutationActionResult> {
-  return guardedAction({
-    context: "release dispatcher reservation",
-    input,
-    schema: dispatcherReleaseReservationSchema,
-    describeBoundary: describeWorkflowMutationBoundary,
-    foundationMessage:
-      "Reservation release is validated but not executed in Stage 1D-A.",
-  });
+  try {
+    assertDispatcherMutationAllowed("release dispatcher reservation");
+    const parsedInput = dispatcherReleaseReservationSchema.parse(input);
+    const reservation = await releaseLoadReservation(parsedInput);
+    revalidatePath("/dispatcher");
+
+    return dispatcherActionSuccess(`Reservation ${reservation.id} released.`);
+  } catch (error) {
+    return reservationMutationFailure(error);
+  }
 }
