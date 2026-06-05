@@ -30,6 +30,7 @@ type MatchingRunRow = typeof matchingRuns.$inferSelect;
 export type DispatcherVehicleView = {
   id: string;
   unitNumber: string;
+  vin: string | null;
   equipmentType: string | null;
   status: string;
   expectedAvailableAt: Date | null;
@@ -270,6 +271,7 @@ async function getVehicles(db: Db, organizationId: string) {
     return {
       id: vehicle.id,
       unitNumber: vehicle.unitNumber,
+      vin: vehicle.vin,
       equipmentType: vehicle.equipmentType,
       status: vehicle.status,
       expectedAvailableAt: vehicle.expectedAvailableAt,
