@@ -172,8 +172,7 @@ export const dispatcherVehicleStatusSchema = z.enum([
   "inactive",
 ]);
 
-export const dispatcherCreateVehicleSchema = z.object({
-  organizationId: uuidSchema,
+const dispatcherVehicleMutationFields = z.object({
   unitNumber: z.string().trim().min(1).max(80),
   vin: optionalTextSchema,
   equipmentType: z.string().trim().min(1).max(80),
@@ -181,11 +180,48 @@ export const dispatcherCreateVehicleSchema = z.object({
   expectedAvailableAt: isoDateSchema,
 });
 
-export const dispatcherEditVehicleSchema = dispatcherCreateVehicleSchema
+function validateVehicleAvailability(
+  value: {
+    status?: z.infer<typeof dispatcherVehicleStatusSchema>;
+    expectedAvailableAt?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (value.status === "available_soon" && !value.expectedAvailableAt) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["expectedAvailableAt"],
+      message: "Expected availability time is required for available soon vehicles.",
+    });
+  }
+}
+
+export const dispatcherCreateVehicleSchema = dispatcherVehicleMutationFields
+  .extend({
+    organizationId: uuidSchema,
+  })
+  .superRefine(validateVehicleAvailability);
+
+export const dispatcherEditVehicleSchema = dispatcherVehicleMutationFields
   .partial()
   .extend({
     organizationId: uuidSchema,
     vehicleId: uuidSchema,
+  })
+  .superRefine((value, ctx) => {
+    const changedKeys = Object.keys(value).filter(
+      (key) => !["organizationId", "vehicleId"].includes(key),
+    );
+
+    if (changedKeys.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["vehicleId"],
+        message: "At least one vehicle field must be provided for edit.",
+      });
+    }
+
+    validateVehicleAvailability(value, ctx);
   });
 
 export const dispatcherReserveLoadSchema = z.object({
