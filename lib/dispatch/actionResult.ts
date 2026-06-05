@@ -7,6 +7,9 @@ export type DispatcherMutationErrorCode =
   | "LOAD_NOT_EDITABLE_WHILE_RESERVED"
   | "LOAD_NO_CHANGES"
   | "LOAD_INVALID_TIMING"
+  | "VEHICLE_NOT_FOUND"
+  | "VEHICLE_NO_CHANGES"
+  | "VEHICLE_DUPLICATE_UNIT_NUMBER"
   | "UNKNOWN_ERROR";
 
 export type DispatcherMutationActionResult = {
