@@ -77,6 +77,11 @@ export type DispatcherSuggestionView = {
   scoreBreakdownSummary: string;
 };
 
+export type DispatcherReservationSummary = {
+  activeHolds: number;
+  expiredHolds: number;
+};
+
 export type DispatcherCockpitData = {
   isConfigured: boolean;
   organization:
@@ -90,6 +95,12 @@ export type DispatcherCockpitData = {
   loads: DispatcherLoadView[];
   latestMatchingRun: DispatcherMatchingRunView | null;
   suggestions: DispatcherSuggestionView[];
+  reservationSummary: DispatcherReservationSummary;
+};
+
+const emptyReservationSummary: DispatcherReservationSummary = {
+  activeHolds: 0,
+  expiredHolds: 0,
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -428,6 +439,31 @@ async function getSuggestions(
   }));
 }
 
+async function getReservationSummary(
+  db: Db,
+  organizationId: string,
+): Promise<DispatcherReservationSummary> {
+  const rows = await db
+    .select({ status: loadReservations.status })
+    .from(loadReservations)
+    .where(eq(loadReservations.organizationId, organizationId));
+
+  return rows.reduce(
+    (summary, reservation) => {
+      if (reservation.status === "active") {
+        summary.activeHolds += 1;
+      }
+
+      if (reservation.status === "expired") {
+        summary.expiredHolds += 1;
+      }
+
+      return summary;
+    },
+    { ...emptyReservationSummary },
+  );
+}
+
 export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData> {
   if (!hasDatabaseUrl()) {
     return {
@@ -437,6 +473,7 @@ export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData>
       loads: [],
       latestMatchingRun: null,
       suggestions: [],
+      reservationSummary: emptyReservationSummary,
     };
   }
 
@@ -451,16 +488,19 @@ export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData>
       loads: [],
       latestMatchingRun: null,
       suggestions: [],
+      reservationSummary: emptyReservationSummary,
     };
   }
 
   await expireDispatcherReservations({ db, organizationId: organization.id });
 
-  const [vehicleViews, loadViews, latestMatchingRun] = await Promise.all([
-    getVehicles(db, organization.id),
-    getLoads(db, organization.id),
-    getLatestMatchingRun(db, organization.id),
-  ]);
+  const [vehicleViews, loadViews, latestMatchingRun, reservationSummary] =
+    await Promise.all([
+      getVehicles(db, organization.id),
+      getLoads(db, organization.id),
+      getLatestMatchingRun(db, organization.id),
+      getReservationSummary(db, organization.id),
+    ]);
 
   const suggestions = latestMatchingRun
     ? await getSuggestions(db, organization.id, latestMatchingRun.row.id)
@@ -473,5 +513,6 @@ export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData>
     loads: loadViews,
     latestMatchingRun,
     suggestions,
+    reservationSummary,
   };
 }
