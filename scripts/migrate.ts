@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Pool } from "@neondatabase/serverless";
 import { getDatabaseUrl } from "../lib/db/config";
+import { assertDevDispatcherDatabase } from "../lib/dispatch/devDatabaseGuard";
 
 const migrationsDir = join(process.cwd(), "drizzle");
 
@@ -18,6 +19,8 @@ function migrationStatements(migrationSql: string) {
 }
 
 async function main() {
+  assertDevDispatcherDatabase("database migrations");
+
   const databaseUrl = getDatabaseUrl("database migrations");
   const pool = new Pool({ connectionString: databaseUrl });
   const migrationFiles = readdirSync(migrationsDir)
