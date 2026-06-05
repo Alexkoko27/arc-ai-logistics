@@ -12,6 +12,7 @@ import { assertDevDispatcherDatabaseTarget } from "./devDatabaseGuard";
 type Db = ReturnType<typeof getDb>;
 type TransactionDb = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type MutationDb = Db | TransactionDb;
+type DateInput = string | Date | null | undefined;
 
 type ReserveLoadInput = {
   organizationId: string;
@@ -20,7 +21,7 @@ type ReserveLoadInput = {
   driverId?: string;
   loadSuggestionId?: string;
   reservedByUserId?: string;
-  expiresAt?: Date;
+  expiresAt?: DateInput;
 };
 
 type ReleaseReservationInput = {
@@ -29,11 +30,29 @@ type ReleaseReservationInput = {
   releaseReason?: "released" | "expired" | "cancelled";
 };
 
+export type DispatcherReservationDomainErrorCode = "RESERVATION_NOT_FOUND";
+
+export class DispatcherReservationDomainError extends Error {
+  constructor(
+    public code: DispatcherReservationDomainErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "DispatcherReservationDomainError";
+  }
+}
+
 export class ActiveLoadReservationConflictError extends Error {
   constructor(loadId: string, options?: { cause?: unknown }) {
     super(`Load ${loadId} already has an active reservation.`, options);
     this.name = "ActiveLoadReservationConflictError";
   }
+}
+
+function toDate(value: DateInput) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  return new Date(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -183,8 +202,8 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
         loadSuggestionId: input.loadSuggestionId ?? null,
         reservedByUserId: input.reservedByUserId ?? null,
         status: "active",
-        expiresAt: input.expiresAt ?? new Date(Date.now() + 30 * 60 * 1000),
-        metadata: { stage: "1B" },
+        expiresAt: toDate(input.expiresAt) ?? new Date(Date.now() + 30 * 60 * 1000),
+        metadata: { stage: "1D-D-A" },
       })
       .returning()
   )[0];
@@ -273,7 +292,10 @@ async function releaseLoadReservationWithDb(
   )[0];
 
   if (!reservation) {
-    throw new Error(`Active reservation ${input.reservationId} was not found for this organization.`);
+    throw new DispatcherReservationDomainError(
+      "RESERVATION_NOT_FOUND",
+      `Active reservation ${input.reservationId} was not found for this organization.`,
+    );
   }
 
   const remainingActiveReservation = (
