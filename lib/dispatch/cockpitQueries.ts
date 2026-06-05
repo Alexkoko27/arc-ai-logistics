@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, hasDatabaseUrl } from "../db/client";
 import {
   drivers,
@@ -15,6 +15,7 @@ import {
   vehicles,
 } from "../db/schema";
 import { dispatcherMockData } from "./mockData";
+import { expireDispatcherReservations } from "./reservationService";
 
 type Db = ReturnType<typeof getDb>;
 type JsonRecord = Record<string, unknown>;
@@ -316,6 +317,7 @@ async function getLoads(db: Db, organizationId: string) {
       and(
         eq(loadReservations.organizationId, organizationId),
         eq(loadReservations.status, "active"),
+        sql`${loadReservations.expiresAt} > now()`,
       ),
     );
 
@@ -406,6 +408,7 @@ async function getSuggestions(
       and(
         eq(loadReservations.organizationId, organizationId),
         eq(loadReservations.status, "active"),
+        sql`${loadReservations.expiresAt} > now()`,
       ),
     );
 
@@ -450,6 +453,8 @@ export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData>
       suggestions: [],
     };
   }
+
+  await expireDispatcherReservations({ db, organizationId: organization.id });
 
   const [vehicleViews, loadViews, latestMatchingRun] = await Promise.all([
     getVehicles(db, organization.id),
