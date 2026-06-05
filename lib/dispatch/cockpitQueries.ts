@@ -82,6 +82,23 @@ export type DispatcherReservationSummary = {
   expiredHolds: number;
 };
 
+export type DispatcherReservationActivityItem = {
+  reservationId: string;
+  loadReference: string;
+  loadSuggestionId: string;
+  suggestionReference: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  releasedAt: Date | null;
+};
+
+export type DispatcherReservationActivity = {
+  active: DispatcherReservationActivityItem[];
+  released: DispatcherReservationActivityItem[];
+  expired: DispatcherReservationActivityItem[];
+};
+
 export type DispatcherCockpitData = {
   isConfigured: boolean;
   organization:
@@ -96,11 +113,18 @@ export type DispatcherCockpitData = {
   latestMatchingRun: DispatcherMatchingRunView | null;
   suggestions: DispatcherSuggestionView[];
   reservationSummary: DispatcherReservationSummary;
+  reservationActivity: DispatcherReservationActivity;
 };
 
 const emptyReservationSummary: DispatcherReservationSummary = {
   activeHolds: 0,
   expiredHolds: 0,
+};
+
+const emptyReservationActivity: DispatcherReservationActivity = {
+  active: [],
+  released: [],
+  expired: [],
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -195,6 +219,15 @@ function summarizeScoreBreakdown(scoreBreakdown: unknown) {
       return `${key}: ${Number.isFinite(score) ? score.toFixed(1) : value}`;
     })
     .join(", ");
+}
+
+function loadReference(load: LoadRow | null, fallbackLoadId: string) {
+  return load?.referenceNumber ?? load?.externalId ?? fallbackLoadId;
+}
+
+function suggestionReference(suggestion: LoadSuggestionRow | null, fallbackId: string) {
+  const rankLabel = suggestion?.rank ? `rank ${suggestion.rank}` : null;
+  return [rankLabel, fallbackId].filter(Boolean).join(" | ");
 }
 
 async function getDisplayOrganization(db: Db) {
@@ -471,6 +504,57 @@ async function getReservationSummary(
   );
 }
 
+async function getReservationActivityByStatus(
+  db: Db,
+  organizationId: string,
+  status: "active" | "released" | "expired",
+) {
+  const rows = await db
+    .select({
+      reservation: loadReservations,
+      load: loads,
+      suggestion: loadSuggestions,
+    })
+    .from(loadReservations)
+    .leftJoin(loads, eq(loadReservations.loadId, loads.id))
+    .leftJoin(loadSuggestions, eq(loadReservations.loadSuggestionId, loadSuggestions.id))
+    .where(
+      and(
+        eq(loadReservations.organizationId, organizationId),
+        eq(loadReservations.status, status),
+        status === "active"
+          ? sql`${loadReservations.expiresAt} > now()`
+          : undefined,
+      ),
+    )
+    .orderBy(desc(loadReservations.updatedAt))
+    .limit(4);
+
+  return rows.map(({ reservation, load, suggestion }) => ({
+    reservationId: reservation.id,
+    loadReference: loadReference(load, reservation.loadId),
+    loadSuggestionId: reservation.loadSuggestionId,
+    suggestionReference: suggestionReference(suggestion, reservation.loadSuggestionId),
+    status: reservation.status,
+    createdAt: reservation.createdAt,
+    updatedAt: reservation.updatedAt,
+    releasedAt: reservation.releasedAt,
+  }));
+}
+
+async function getReservationActivity(
+  db: Db,
+  organizationId: string,
+): Promise<DispatcherReservationActivity> {
+  const [active, released, expired] = await Promise.all([
+    getReservationActivityByStatus(db, organizationId, "active"),
+    getReservationActivityByStatus(db, organizationId, "released"),
+    getReservationActivityByStatus(db, organizationId, "expired"),
+  ]);
+
+  return { active, released, expired };
+}
+
 export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData> {
   if (!hasDatabaseUrl()) {
     return {
@@ -481,6 +565,7 @@ export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData>
       latestMatchingRun: null,
       suggestions: [],
       reservationSummary: emptyReservationSummary,
+      reservationActivity: emptyReservationActivity,
     };
   }
 
@@ -496,18 +581,25 @@ export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData>
       latestMatchingRun: null,
       suggestions: [],
       reservationSummary: emptyReservationSummary,
+      reservationActivity: emptyReservationActivity,
     };
   }
 
   await expireDispatcherReservations({ db, organizationId: organization.id });
 
-  const [vehicleViews, loadViews, latestMatchingRun, reservationSummary] =
-    await Promise.all([
-      getVehicles(db, organization.id),
-      getLoads(db, organization.id),
-      getLatestMatchingRun(db, organization.id),
-      getReservationSummary(db, organization.id),
-    ]);
+  const [
+    vehicleViews,
+    loadViews,
+    latestMatchingRun,
+    reservationSummary,
+    reservationActivity,
+  ] = await Promise.all([
+    getVehicles(db, organization.id),
+    getLoads(db, organization.id),
+    getLatestMatchingRun(db, organization.id),
+    getReservationSummary(db, organization.id),
+    getReservationActivity(db, organization.id),
+  ]);
 
   const suggestions = latestMatchingRun
     ? await getSuggestions(db, organization.id, latestMatchingRun.row.id)
@@ -521,5 +613,6 @@ export async function getDispatcherCockpitData(): Promise<DispatcherCockpitData>
     latestMatchingRun,
     suggestions,
     reservationSummary,
+    reservationActivity,
   };
 }
