@@ -230,7 +230,7 @@ export const dispatcherReserveLoadSchema = z.object({
   loadId: uuidSchema,
   vehicleId: uuidSchema.optional(),
   driverId: uuidSchema.optional(),
-  loadSuggestionId: uuidSchema.optional(),
+  loadSuggestionId: uuidSchema,
   reservedByUserId: uuidSchema.optional(),
   expiresAt: isoDateSchema,
 });
