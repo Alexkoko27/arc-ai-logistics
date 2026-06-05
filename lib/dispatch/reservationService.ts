@@ -3,8 +3,10 @@ import { getDb } from "../db/client";
 import {
   drivers,
   loadReservations,
+  loadStops,
   loads,
   loadSuggestions,
+  locations,
   vehicles,
 } from "../db/schema";
 import { assertDevDispatcherDatabaseTarget } from "./devDatabaseGuard";
@@ -16,6 +18,12 @@ type DateInput = string | Date | null | undefined;
 type LoadRow = typeof loads.$inferSelect;
 type LoadSuggestionRow = typeof loadSuggestions.$inferSelect;
 type VehicleRow = typeof vehicles.$inferSelect;
+type LocationRow = typeof locations.$inferSelect;
+type LoadStopRow = typeof loadStops.$inferSelect;
+
+export type LoadSuggestionCurrentStop = LoadStopRow & {
+  location: LocationRow | null;
+};
 
 type ReserveLoadInput = {
   organizationId: string;
@@ -123,14 +131,88 @@ function numericValuesChanged(snapshot: string | null, current: string | null) {
   return snapshotNumber !== currentNumber;
 }
 
+function snapshotLocationValue(snapshot: unknown, key: string) {
+  if (!isRecord(snapshot)) return null;
+  return snapshotValue(snapshot.location, key);
+}
+
+function currentLocationValue(location: LocationRow | null, key: keyof LocationRow) {
+  if (!location) return null;
+  return rowValue(location[key] as string | number | null | undefined);
+}
+
+function stopKey(stop: { stopType: string; sequence: number }) {
+  return `${stop.stopType}:${stop.sequence}`;
+}
+
+function snapshotStopKey(stop: unknown) {
+  if (!isRecord(stop)) return null;
+  const stopType = snapshotValue(stop, "stopType");
+  const sequence = snapshotValue(stop, "sequence");
+  return stopType && sequence ? `${stopType}:${sequence}` : null;
+}
+
+function currentStopsChanged(
+  loadSnapshot: unknown,
+  currentStops: LoadSuggestionCurrentStop[],
+) {
+  if (!isRecord(loadSnapshot) || !Array.isArray(loadSnapshot.stops)) {
+    return true;
+  }
+
+  if (loadSnapshot.stops.length !== currentStops.length) {
+    return true;
+  }
+
+  const currentStopsByKey = new Map(
+    currentStops.map((stop) => [stopKey(stop), stop]),
+  );
+
+  return loadSnapshot.stops.some((snapshotStop) => {
+    if (!isRecord(snapshotStop)) return true;
+
+    const key = snapshotStopKey(snapshotStop);
+    const currentStop = key ? currentStopsByKey.get(key) : null;
+    if (!currentStop) return true;
+
+    const stopChecks: Array<[string | null, string | null]> = [
+      [snapshotValue(snapshotStop, "stopType"), rowValue(currentStop.stopType)],
+      [snapshotValue(snapshotStop, "sequence"), rowValue(currentStop.sequence)],
+      [
+        snapshotDateValue(snapshotStop, "appointmentStartsAt"),
+        rowDateValue(currentStop.appointmentStartsAt),
+      ],
+      [
+        snapshotDateValue(snapshotStop, "appointmentEndsAt"),
+        rowDateValue(currentStop.appointmentEndsAt),
+      ],
+      [snapshotLocationValue(snapshotStop, "id"), currentStop.locationId],
+      [snapshotLocationValue(snapshotStop, "city"), currentLocationValue(currentStop.location, "city")],
+      [snapshotLocationValue(snapshotStop, "state"), currentLocationValue(currentStop.location, "state")],
+      [
+        snapshotLocationValue(snapshotStop, "latitude"),
+        currentLocationValue(currentStop.location, "latitude"),
+      ],
+      [
+        snapshotLocationValue(snapshotStop, "longitude"),
+        currentLocationValue(currentStop.location, "longitude"),
+      ],
+    ];
+
+    return stopChecks.some(([snapshot, current]) => valuesChanged(snapshot, current));
+  });
+}
+
 export function getLoadSuggestionReservabilityIssue({
   suggestion,
   load,
   vehicle,
+  currentLoadStops,
 }: {
   suggestion: LoadSuggestionRow;
   load: LoadRow | null;
   vehicle: VehicleRow | null;
+  currentLoadStops: LoadSuggestionCurrentStop[];
 }) {
   if (!load) {
     return "Load suggestion load is no longer available in this organization.";
@@ -212,6 +294,10 @@ export function getLoadSuggestionReservabilityIssue({
     return "Load suggestion is stale because the load timing changed after matching.";
   }
 
+  if (currentStopsChanged(loadSnapshot, currentLoadStops)) {
+    return "Load suggestion is stale because the load stops changed after matching.";
+  }
+
   const vehicleChecks: Array<[string, string | null, string | null]> = [
     [
       "equipmentType",
@@ -237,16 +323,53 @@ function assertSuggestionStillMatchesCurrentState({
   suggestion,
   load,
   vehicle,
+  currentLoadStops,
 }: {
   suggestion: LoadSuggestionRow;
   load: LoadRow;
   vehicle: VehicleRow;
+  currentLoadStops: LoadSuggestionCurrentStop[];
 }) {
-  const issue = getLoadSuggestionReservabilityIssue({ suggestion, load, vehicle });
+  const issue = getLoadSuggestionReservabilityIssue({
+    suggestion,
+    load,
+    vehicle,
+    currentLoadStops,
+  });
 
   if (issue) {
     throw loadSuggestionNotReservable(issue);
   }
+}
+
+async function getCurrentLoadStops(
+  db: MutationDb,
+  organizationId: string,
+  loadId: string,
+) {
+  const rows = await db
+    .select({
+      stop: loadStops,
+      location: locations,
+    })
+    .from(loadStops)
+    .leftJoin(
+      locations,
+      and(
+        eq(loadStops.locationId, locations.id),
+        eq(locations.organizationId, organizationId),
+      ),
+    )
+    .where(
+      and(
+        eq(loadStops.organizationId, organizationId),
+        eq(loadStops.loadId, loadId),
+      ),
+    );
+
+  return rows
+    .map(({ stop, location }) => ({ ...stop, location }))
+    .sort((a, b) => a.sequence - b.sequence);
 }
 
 function isActiveReservationConflict(error: unknown) {
@@ -484,7 +607,18 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
     throw new Error(`Vehicle ${resolvedVehicleId} was not found for this organization.`);
   }
 
-  assertSuggestionStillMatchesCurrentState({ suggestion, load, vehicle });
+  const currentLoadStops = await getCurrentLoadStops(
+    db,
+    input.organizationId,
+    input.loadId,
+  );
+
+  assertSuggestionStillMatchesCurrentState({
+    suggestion,
+    load,
+    vehicle,
+    currentLoadStops,
+  });
 
   if (input.driverId) {
     await assertDriverBelongsToOrganization(db, input.organizationId, input.driverId);

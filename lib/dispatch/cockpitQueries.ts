@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, hasDatabaseUrl } from "../db/client";
 import {
   drivers,
@@ -15,7 +15,10 @@ import {
   vehicles,
 } from "../db/schema";
 import { dispatcherMockData } from "./mockData";
-import { expireDispatcherReservations } from "./reservationService";
+import {
+  expireDispatcherReservations,
+  type LoadSuggestionCurrentStop,
+} from "./reservationService";
 
 type Db = ReturnType<typeof getDb>;
 type JsonRecord = Record<string, unknown>;
@@ -72,6 +75,7 @@ export type DispatcherSuggestionView = {
   load: LoadRow | null;
   vehicle: VehicleRow | null;
   activeReservation: LoadReservationRow | null;
+  currentLoadStops: LoadSuggestionCurrentStop[];
   loadSnapshotSummary: string;
   vehicleSnapshotSummary: string;
   scoreBreakdownSummary: string;
@@ -467,10 +471,45 @@ async function getSuggestions(
         sql`${loadReservations.expiresAt} > now()`,
       ),
     );
+  const suggestionLoadIds = [
+    ...new Set(suggestionRows.map(({ suggestion }) => suggestion.loadId)),
+  ];
+  const stopRows =
+    suggestionLoadIds.length > 0
+      ? await db
+          .select({
+            stop: loadStops,
+            location: locations,
+          })
+          .from(loadStops)
+          .leftJoin(
+            locations,
+            and(
+              eq(loadStops.locationId, locations.id),
+              eq(locations.organizationId, organizationId),
+            ),
+          )
+          .where(
+            and(
+              eq(loadStops.organizationId, organizationId),
+              inArray(loadStops.loadId, suggestionLoadIds),
+            ),
+          )
+      : [];
 
   const activeReservationByLoad = new Map<string, LoadReservationRow>();
   for (const reservation of activeReservations) {
     activeReservationByLoad.set(reservation.loadId, reservation);
+  }
+  const currentStopsByLoad = new Map<string, LoadSuggestionCurrentStop[]>();
+  for (const row of stopRows) {
+    const existing = currentStopsByLoad.get(row.stop.loadId) ?? [];
+    existing.push({ ...row.stop, location: row.location });
+    currentStopsByLoad.set(row.stop.loadId, existing);
+  }
+
+  for (const stops of currentStopsByLoad.values()) {
+    stops.sort((a, b) => a.sequence - b.sequence);
   }
 
   return suggestionRows.map(({ suggestion, load, vehicle }) => ({
@@ -478,6 +517,7 @@ async function getSuggestions(
     load,
     vehicle,
     activeReservation: activeReservationByLoad.get(suggestion.loadId) ?? null,
+    currentLoadStops: currentStopsByLoad.get(suggestion.loadId) ?? [],
     loadSnapshotSummary: summarizeLoadSnapshot(suggestion.loadSnapshot),
     vehicleSnapshotSummary: summarizeVehicleSnapshot(suggestion.vehicleSnapshot),
     scoreBreakdownSummary: summarizeScoreBreakdown(suggestion.scoreBreakdown),

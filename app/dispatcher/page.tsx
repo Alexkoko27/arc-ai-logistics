@@ -185,7 +185,7 @@ function statusClass(status: string) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
-  if (["reserved", "converted", "booked", "busy"].includes(status)) {
+  if (["reserved", "busy"].includes(status)) {
     return "border-blue-200 bg-blue-50 text-blue-700";
   }
 
@@ -622,6 +622,7 @@ function staleReasonForSuggestion({
     suggestion: suggestion.row,
     load: suggestion.load,
     vehicle: suggestion.vehicle,
+    currentLoadStops: suggestion.currentLoadStops,
   });
 }
 
