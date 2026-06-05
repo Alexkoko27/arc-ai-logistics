@@ -176,7 +176,7 @@ const dispatcherVehicleMutationFields = z.object({
   unitNumber: z.string().trim().min(1).max(80),
   vin: optionalTextSchema,
   equipmentType: z.string().trim().min(1).max(80),
-  status: dispatcherVehicleStatusSchema.default("available"),
+  status: dispatcherVehicleStatusSchema,
   expectedAvailableAt: isoDateSchema,
 });
 
@@ -199,6 +199,7 @@ function validateVehicleAvailability(
 export const dispatcherCreateVehicleSchema = dispatcherVehicleMutationFields
   .extend({
     organizationId: uuidSchema,
+    status: dispatcherVehicleStatusSchema.default("available"),
   })
   .superRefine(validateVehicleAvailability);
 
