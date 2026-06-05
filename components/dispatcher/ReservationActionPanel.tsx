@@ -17,6 +17,8 @@ export type ReservationActionSuggestion = {
   status?: string;
   loadStatus?: string;
   isReservable: boolean;
+  isStale?: boolean;
+  staleReason?: string;
 };
 
 export type ReservationActionActiveReservation = {
@@ -24,6 +26,15 @@ export type ReservationActionActiveReservation = {
   label: string;
   expiresAt: string;
   status?: string;
+  ageLabel?: string;
+  countdownLabel?: string;
+  isStale?: boolean;
+};
+
+type MatchingFreshness = {
+  generatedAtLabel: string;
+  ageLabel: string;
+  isStale: boolean;
 };
 
 type ActiveOperation = "reserve" | "release" | null;
@@ -47,10 +58,12 @@ export default function ReservationActionPanel({
   organizationId,
   suggestions,
   activeReservations,
+  matchingFreshness,
 }: {
   organizationId: string;
   suggestions: ReservationActionSuggestion[];
   activeReservations: ReservationActionActiveReservation[];
+  matchingFreshness: MatchingFreshness | null;
 }) {
   const router = useRouter();
   const submitLockRef = useRef(false);
@@ -67,6 +80,9 @@ export default function ReservationActionPanel({
     [suggestions],
   );
   const staleSuggestionCount = suggestions.length - reservableSuggestions.length;
+  const staleHoldCount = activeReservations.filter(
+    (reservation) => reservation.isStale,
+  ).length;
   const selectedSuggestion =
     reservableSuggestions.find(
       (suggestion) => suggestion.suggestionId === selectedSuggestionId,
@@ -140,10 +156,16 @@ export default function ReservationActionPanel({
             Reservation Actions
           </h2>
           <p className="mt-1 text-sm leading-6 text-violet-800">
-            Stage 1D-D creates and releases only temporary operational holds on
-            loads. Deal, shipment, dispatch, driver assignment, settlement, and
-            payment flows are intentionally excluded.
+            Stage 1D-E shows temporary operational hold freshness and matching
+            suggestion age. Deal, shipment, dispatch, driver assignment,
+            settlement, and payment flows are intentionally excluded.
           </p>
+          {matchingFreshness ? (
+            <p className="mt-2 text-xs font-semibold text-violet-900">
+              Matching generated {matchingFreshness.generatedAtLabel} ({matchingFreshness.ageLabel})
+              {matchingFreshness.isStale ? " - stale for reservation selection" : " - fresh"}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-semibold">
           <span className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-emerald-700">
@@ -152,6 +174,11 @@ export default function ReservationActionPanel({
           <span className="rounded-full border border-blue-200 bg-white px-2.5 py-1 text-blue-700">
             {activeReservations.length} active holds
           </span>
+          {staleHoldCount > 0 ? (
+            <span className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-amber-700">
+              {staleHoldCount} stale holds
+            </span>
+          ) : null}
           {staleSuggestionCount > 0 ? (
             <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-gray-600">
               {staleSuggestionCount} unavailable
@@ -183,7 +210,7 @@ export default function ReservationActionPanel({
           <div>
             <h3 className="font-bold text-gray-950">Reserve Suggested Load</h3>
             <p className="mt-1 text-sm text-gray-600">
-              Reserve an available load from the latest reservable suggestions.
+              Reserve an available load from fresh, reservable suggestions.
             </p>
           </div>
           <label className="space-y-1 text-sm">
@@ -197,7 +224,7 @@ export default function ReservationActionPanel({
               <option value="">
                 {reservableSuggestions.length > 0
                   ? "Select suggestion"
-                  : "No reservable suggestions"}
+                  : "No fresh reservable suggestions"}
               </option>
               {reservableSuggestions.map((suggestion) => (
                 <option key={suggestion.suggestionId} value={suggestion.suggestionId}>
@@ -220,6 +247,21 @@ export default function ReservationActionPanel({
                   {selectedSuggestion.status ?? "suggested"}
                 </span>
               </p>
+            </div>
+          ) : null}
+          {staleSuggestionCount > 0 ? (
+            <div className="rounded-md border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
+              <p className="font-semibold text-gray-700">Unavailable suggestions</p>
+              <ul className="mt-2 space-y-1">
+                {suggestions
+                  .filter((suggestion) => !suggestion.isReservable)
+                  .slice(0, 4)
+                  .map((suggestion) => (
+                    <li key={suggestion.suggestionId}>
+                      {suggestion.label}: {suggestion.staleReason ?? "not reservable"}
+                    </li>
+                  ))}
+              </ul>
             </div>
           ) : null}
           <button
@@ -269,7 +311,16 @@ export default function ReservationActionPanel({
                 </span>
               </p>
               <p className="mt-1">
+                Age: <span className="font-semibold">{selectedReservation.ageLabel ?? "unknown"}</span>
+              </p>
+              <p className="mt-1">
                 Expires: <span className="font-semibold">{selectedReservation.expiresAt}</span>
+              </p>
+              <p className="mt-1">
+                Remaining:{" "}
+                <span className={selectedReservation.isStale ? "font-semibold text-amber-700" : "font-semibold"}>
+                  {selectedReservation.countdownLabel ?? "unknown"}
+                </span>
               </p>
             </div>
           ) : null}
