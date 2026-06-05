@@ -19,7 +19,7 @@ type ReserveLoadInput = {
   loadId: string;
   vehicleId?: string;
   driverId?: string;
-  loadSuggestionId?: string;
+  loadSuggestionId: string;
   reservedByUserId?: string;
   expiresAt?: DateInput;
 };
@@ -55,6 +55,13 @@ function toDate(value: DateInput) {
   if (!value) return null;
   if (value instanceof Date) return value;
   return new Date(value);
+}
+
+function loadSuggestionNotReservable(message: string) {
+  return new DispatcherReservationDomainError(
+    "LOAD_SUGGESTION_NOT_RESERVABLE",
+    message,
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -148,53 +155,54 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
     throw new ActiveLoadReservationConflictError(input.loadId);
   }
 
-  let resolvedVehicleId = input.vehicleId;
-
-  if (input.loadSuggestionId) {
-    const suggestion = (
-      await db
-        .select()
-        .from(loadSuggestions)
-        .where(
-          and(
-            eq(loadSuggestions.organizationId, input.organizationId),
-            eq(loadSuggestions.id, input.loadSuggestionId),
-          ),
-        )
-        .limit(1)
-    )[0];
-
-    if (!suggestion) {
-      throw new Error(
-        `Load suggestion ${input.loadSuggestionId} was not found for this organization.`,
-      );
-    }
-
-    if (suggestion.loadId !== input.loadId) {
-      throw new Error("Load suggestion does not belong to the reserved load.");
-    }
-
-    if (suggestion.status !== "suggested") {
-      throw new DispatcherReservationDomainError(
-        "LOAD_SUGGESTION_NOT_RESERVABLE",
-        "Only suggested load suggestions can be reserved.",
-      );
-    }
-
-    if (resolvedVehicleId && resolvedVehicleId !== suggestion.vehicleId) {
-      throw new Error("Vehicle does not match the load suggestion vehicle.");
-    }
-
-    resolvedVehicleId = suggestion.vehicleId;
-  }
-
-  if (resolvedVehicleId) {
-    await assertVehicleBelongsToOrganization(
-      db,
-      input.organizationId,
-      resolvedVehicleId,
+  if (!input.loadSuggestionId) {
+    throw loadSuggestionNotReservable(
+      "A reservable load suggestion is required to reserve a load.",
     );
   }
+
+  const suggestion = (
+    await db
+      .select()
+      .from(loadSuggestions)
+      .where(
+        and(
+          eq(loadSuggestions.organizationId, input.organizationId),
+          eq(loadSuggestions.id, input.loadSuggestionId),
+        ),
+      )
+      .limit(1)
+  )[0];
+
+  if (!suggestion) {
+    throw loadSuggestionNotReservable(
+      "Load suggestion was not found for this organization.",
+    );
+  }
+
+  if (suggestion.loadId !== input.loadId) {
+    throw loadSuggestionNotReservable(
+      "Load suggestion does not belong to the reserved load.",
+    );
+  }
+
+  if (suggestion.status !== "suggested") {
+    throw loadSuggestionNotReservable(
+      "Only suggested load suggestions can be reserved.",
+    );
+  }
+
+  if (input.vehicleId && input.vehicleId !== suggestion.vehicleId) {
+    throw new Error("Vehicle does not match the load suggestion vehicle.");
+  }
+
+  const resolvedVehicleId = suggestion.vehicleId;
+
+  await assertVehicleBelongsToOrganization(
+    db,
+    input.organizationId,
+    resolvedVehicleId,
+  );
 
   if (input.driverId) {
     await assertDriverBelongsToOrganization(db, input.organizationId, input.driverId);
@@ -206,9 +214,9 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
       .values({
         organizationId: input.organizationId,
         loadId: input.loadId,
-        vehicleId: resolvedVehicleId ?? null,
+        vehicleId: resolvedVehicleId,
         driverId: input.driverId ?? null,
-        loadSuggestionId: input.loadSuggestionId ?? null,
+        loadSuggestionId: input.loadSuggestionId,
         reservedByUserId: input.reservedByUserId ?? null,
         status: "active",
         expiresAt: toDate(input.expiresAt) ?? new Date(Date.now() + 30 * 60 * 1000),
@@ -239,22 +247,20 @@ async function reserveLoadWithDb(db: MutationDb, input: ReserveLoadInput) {
     throw new ActiveLoadReservationConflictError(input.loadId);
   }
 
-  if (input.loadSuggestionId) {
-    await db
-      .update(loadSuggestions)
-      .set({
-        status: "reserved",
-        outcome: "reserved",
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(loadSuggestions.id, input.loadSuggestionId),
-          eq(loadSuggestions.organizationId, input.organizationId),
-          eq(loadSuggestions.loadId, input.loadId),
-        ),
-      );
-  }
+  await db
+    .update(loadSuggestions)
+    .set({
+      status: "reserved",
+      outcome: "reserved",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(loadSuggestions.id, input.loadSuggestionId),
+        eq(loadSuggestions.organizationId, input.organizationId),
+        eq(loadSuggestions.loadId, input.loadId),
+      ),
+    );
 
   return reservation;
 }
