@@ -516,8 +516,21 @@ async function getReservationActivityByStatus(
       suggestion: loadSuggestions,
     })
     .from(loadReservations)
-    .leftJoin(loads, eq(loadReservations.loadId, loads.id))
-    .leftJoin(loadSuggestions, eq(loadReservations.loadSuggestionId, loadSuggestions.id))
+    .leftJoin(
+      loads,
+      and(
+        eq(loadReservations.loadId, loads.id),
+        eq(loads.organizationId, organizationId),
+      ),
+    )
+    .leftJoin(
+      loadSuggestions,
+      and(
+        eq(loadReservations.loadSuggestionId, loadSuggestions.id),
+        eq(loadSuggestions.organizationId, organizationId),
+        eq(loadSuggestions.loadId, loadReservations.loadId),
+      ),
+    )
     .where(
       and(
         eq(loadReservations.organizationId, organizationId),
