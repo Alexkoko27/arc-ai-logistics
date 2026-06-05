@@ -53,6 +53,7 @@ async function main() {
     for (const activeReservation of activeReservations) {
       await releaseLoadReservation({
         db,
+        organizationId: organization.id,
         reservationId: activeReservation.id,
         releaseReason: "released",
       });
@@ -105,6 +106,7 @@ async function main() {
 
   await releaseLoadReservation({
     db,
+    organizationId: organization.id,
     reservationId: firstReservation.id,
     releaseReason: "released",
   });
@@ -119,6 +121,7 @@ async function main() {
 
   await releaseLoadReservation({
     db,
+    organizationId: organization.id,
     reservationId: secondReservation.id,
     releaseReason: "released",
   });
