@@ -6,6 +6,7 @@ export type DispatcherMutationErrorCode =
   | "LOAD_NOT_EDITABLE_STATUS"
   | "LOAD_NOT_EDITABLE_WHILE_RESERVED"
   | "LOAD_NO_CHANGES"
+  | "LOAD_INVALID_TIMING"
   | "UNKNOWN_ERROR";
 
 export type DispatcherMutationActionResult = {
