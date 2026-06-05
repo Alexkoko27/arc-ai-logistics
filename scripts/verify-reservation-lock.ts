@@ -91,6 +91,7 @@ async function main() {
       organizationId: organization.id,
       loadId: suggestion.loadId,
       vehicleId: suggestion.vehicleId,
+      loadSuggestionId: suggestion.suggestionId,
     });
   } catch (error) {
     if (!(error instanceof ActiveLoadReservationConflictError)) {
