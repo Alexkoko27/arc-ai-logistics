@@ -444,13 +444,20 @@ async function getReservationSummary(
   organizationId: string,
 ): Promise<DispatcherReservationSummary> {
   const rows = await db
-    .select({ status: loadReservations.status })
+    .select({
+      status: loadReservations.status,
+      expiresAt: loadReservations.expiresAt,
+    })
     .from(loadReservations)
     .where(eq(loadReservations.organizationId, organizationId));
+  const now = new Date();
 
   return rows.reduce(
     (summary, reservation) => {
-      if (reservation.status === "active") {
+      if (
+        reservation.status === "active" &&
+        reservation.expiresAt.getTime() > now.getTime()
+      ) {
         summary.activeHolds += 1;
       }
 
