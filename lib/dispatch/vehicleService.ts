@@ -28,7 +28,8 @@ export type DispatcherVehicleMutationResult = {
 export type DispatcherVehicleDomainErrorCode =
   | "VEHICLE_NOT_FOUND"
   | "VEHICLE_NO_CHANGES"
-  | "VEHICLE_DUPLICATE_UNIT_NUMBER";
+  | "VEHICLE_DUPLICATE_UNIT_NUMBER"
+  | "VEHICLE_INVALID_AVAILABILITY";
 
 export class DispatcherVehicleDomainError extends Error {
   constructor(
@@ -61,6 +62,15 @@ function datesEqual(left: DateInput, right: DateInput) {
 
 function nullableEqual(left: unknown, right: unknown) {
   return (left ?? null) === (right ?? null);
+}
+
+function assertVehicleAvailability(status: string | undefined, expectedAvailableAt: Date | null) {
+  if (status === "available_soon" && !expectedAvailableAt) {
+    throw new DispatcherVehicleDomainError(
+      "VEHICLE_INVALID_AVAILABILITY",
+      "Expected availability time is required for available soon vehicles.",
+    );
+  }
 }
 
 function vehicleFields(
@@ -129,6 +139,9 @@ async function createDispatcherVehicleWithDb(
   db: MutationDb,
   input: DispatcherCreateVehicleInput,
 ) {
+  const expectedAvailableAt = toDate(input.expectedAvailableAt);
+  assertVehicleAvailability(input.status, expectedAvailableAt);
+
   const vehicle = (
     await db
       .insert(vehicles)
@@ -138,7 +151,7 @@ async function createDispatcherVehicleWithDb(
         vin: input.vin ?? null,
         equipmentType: input.equipmentType,
         status: input.status,
-        expectedAvailableAt: toDate(input.expectedAvailableAt),
+        expectedAvailableAt,
         metadata: { stage: "1D-C", source: dispatcherUiSourceId },
       })
       .returning()
@@ -188,6 +201,14 @@ async function editDispatcherVehicleWithDb(
       "No semantic vehicle changes were provided for edit.",
     );
   }
+
+  const effectiveStatus =
+    typeof fieldsToSet.status === "string" ? fieldsToSet.status : existingVehicle.status;
+  const effectiveExpectedAvailableAt =
+    "expectedAvailableAt" in fieldsToSet
+      ? (fieldsToSet.expectedAvailableAt as Date | null)
+      : existingVehicle.expectedAvailableAt;
+  assertVehicleAvailability(effectiveStatus, effectiveExpectedAvailableAt);
 
   const updatedVehicle = (
     await db
