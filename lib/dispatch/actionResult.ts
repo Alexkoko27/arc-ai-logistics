@@ -10,6 +10,7 @@ export type DispatcherMutationErrorCode =
   | "VEHICLE_NOT_FOUND"
   | "VEHICLE_NO_CHANGES"
   | "VEHICLE_DUPLICATE_UNIT_NUMBER"
+  | "VEHICLE_INVALID_AVAILABILITY"
   | "UNKNOWN_ERROR";
 
 export type DispatcherMutationActionResult = {
