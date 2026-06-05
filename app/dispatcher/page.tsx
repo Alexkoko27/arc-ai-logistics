@@ -18,6 +18,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const MATCHING_STALE_AFTER_MINUTES = 30;
+const HOLD_STALE_REMAINING_MINUTES = 5;
+const MINUTE_MS = 60 * 1000;
+
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
 
@@ -31,6 +35,15 @@ function formatDate(value: Date | null) {
 
 function formatDateInput(value: Date | null) {
   return value ? value.toISOString().slice(0, 16) : "";
+}
+
+function formatDuration(ms: number) {
+  const absoluteMinutes = Math.max(0, Math.round(Math.abs(ms) / MINUTE_MS));
+  if (absoluteMinutes < 60) return `${absoluteMinutes}m`;
+
+  const hours = Math.floor(absoluteMinutes / 60);
+  const minutes = absoluteMinutes % 60;
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 function formatCurrency(amount: string | null, currency = "USD") {
@@ -74,12 +87,16 @@ function loadStopLabel(load: DispatcherLoadView, stopType: "pickup" | "dropoff")
 }
 
 function statusClass(status: string) {
-  if (["available", "suggested", "completed", "active"].includes(status)) {
+  if (["available", "suggested", "completed", "active", "fresh"].includes(status)) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
   if (["reserved", "converted", "booked", "busy"].includes(status)) {
     return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+
+  if (["stale", "expiring"].includes(status)) {
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
   if (["released", "expired", "cancelled", "dismissed"].includes(status)) {
@@ -128,6 +145,24 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
+function MetricCard({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string | number;
+  description: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-gray-950">{value}</p>
+      <p className="mt-1 text-xs text-gray-500">{description}</p>
+    </div>
+  );
+}
+
 function VehicleCard({ vehicle }: { vehicle: DispatcherVehicleView }) {
   return (
     <article className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -172,22 +207,40 @@ function VehicleCard({ vehicle }: { vehicle: DispatcherVehicleView }) {
   );
 }
 
-function ReservationState({ load }: { load: DispatcherLoadView }) {
+function ReservationState({
+  load,
+  now,
+}: {
+  load: DispatcherLoadView;
+  now: Date;
+}) {
   if (!load.activeReservation) {
     return <span className="text-sm text-gray-500">No active reservation</span>;
   }
 
+  const remainingMs = load.activeReservation.expiresAt.getTime() - now.getTime();
+  const isStale = remainingMs <= HOLD_STALE_REMAINING_MINUTES * MINUTE_MS;
+
   return (
     <div className="space-y-1">
-      <StatusBadge status={load.activeReservation.status} />
+      <div className="flex flex-wrap gap-2">
+        <StatusBadge status={load.activeReservation.status} />
+        {isStale ? <StatusBadge status="expiring" /> : null}
+      </div>
+      <p className="text-xs text-gray-500">
+        Age {formatDuration(now.getTime() - load.activeReservation.reservedAt.getTime())}
+      </p>
       <p className="text-xs text-gray-500">
         Expires {formatDate(load.activeReservation.expiresAt)}
+      </p>
+      <p className={isStale ? "text-xs font-semibold text-amber-700" : "text-xs text-gray-500"}>
+        {formatDuration(remainingMs)} remaining
       </p>
     </div>
   );
 }
 
-function LoadTable({ loads }: { loads: DispatcherLoadView[] }) {
+function LoadTable({ loads, now }: { loads: DispatcherLoadView[]; now: Date }) {
   if (loads.length === 0) {
     return <EmptyState label="No loads found for this organization." />;
   }
@@ -239,7 +292,7 @@ function LoadTable({ loads }: { loads: DispatcherLoadView[] }) {
                 <StatusBadge status={load.status} />
               </td>
               <td className="px-4 py-4">
-                <ReservationState load={load} />
+                <ReservationState load={load} now={now} />
               </td>
             </tr>
           ))}
@@ -251,8 +304,10 @@ function LoadTable({ loads }: { loads: DispatcherLoadView[] }) {
 
 function SuggestionCard({
   suggestion,
+  matchingIsStale,
 }: {
   suggestion: DispatcherSuggestionView;
+  matchingIsStale: boolean;
 }) {
   const activeReservation = suggestion.activeReservation;
   const reservationLabel = activeReservation
@@ -272,9 +327,13 @@ function SuggestionCard({
               suggestion.load?.externalId ??
               "load"}
           </h3>
+          <p className="mt-1 text-xs text-gray-500">
+            Suggestion persisted {formatDate(suggestion.row.createdAt)}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <StatusBadge status={suggestion.row.status} />
+          {matchingIsStale ? <StatusBadge status="stale" /> : <StatusBadge status="fresh" />}
           {activeReservation ? (
             <StatusBadge status={activeReservation.status} />
           ) : null}
@@ -345,9 +404,39 @@ function SuggestionCard({
   );
 }
 
+function staleReasonForSuggestion({
+  suggestion,
+  matchingIsStale,
+}: {
+  suggestion: DispatcherSuggestionView;
+  matchingIsStale: boolean;
+}) {
+  if (matchingIsStale) return "matching run is stale";
+  if (suggestion.row.status !== "suggested") return `suggestion is ${suggestion.row.status}`;
+  if (suggestion.load?.status !== "available") {
+    return `load is ${suggestion.load?.status ?? "unavailable"}`;
+  }
+  if (suggestion.activeReservation) return "load already has an active hold";
+  return null;
+}
+
 export default async function DispatcherCockpitPage() {
   const data = await getDispatcherCockpitData();
+  const now = new Date();
   const latestRun = data.latestMatchingRun;
+  const matchingAgeMs = latestRun
+    ? now.getTime() - latestRun.row.createdAt.getTime()
+    : null;
+  const matchingIsStale =
+    matchingAgeMs !== null &&
+    matchingAgeMs > MATCHING_STALE_AFTER_MINUTES * MINUTE_MS;
+  const matchingFreshness = latestRun
+    ? {
+        generatedAtLabel: formatDate(latestRun.row.createdAt),
+        ageLabel: `${formatDuration(matchingAgeMs ?? 0)} old`,
+        isStale: matchingIsStale,
+      }
+    : null;
   const editableVehicles: VehicleMutationPanelVehicle[] = data.vehicles.map(
     (vehicle) => ({
       id: vehicle.id,
@@ -387,30 +476,52 @@ export default async function DispatcherCockpitPage() {
       };
     });
   const reservationSuggestions: ReservationActionSuggestion[] = data.suggestions.map(
-    (suggestion) => ({
-      suggestionId: suggestion.row.id,
-      loadId: suggestion.row.loadId,
-      vehicleId: suggestion.row.vehicleId,
-      label: [
-        suggestion.vehicle?.unitNumber ?? "Vehicle",
-        suggestion.load?.referenceNumber ?? suggestion.load?.externalId ?? "load",
-      ].join(" for "),
-      scoreLabel: suggestion.row.scoreTotal
-        ? `(score ${formatScore(suggestion.row.scoreTotal)})`
-        : "",
-      isReservable:
-        suggestion.row.status === "suggested" &&
-        suggestion.load?.status === "available" &&
-        !suggestion.activeReservation,
-    }),
+    (suggestion) => {
+      const staleReason = staleReasonForSuggestion({ suggestion, matchingIsStale });
+
+      return {
+        suggestionId: suggestion.row.id,
+        loadId: suggestion.row.loadId,
+        vehicleId: suggestion.row.vehicleId,
+        label: [
+          suggestion.vehicle?.unitNumber ?? "Vehicle",
+          suggestion.load?.referenceNumber ?? suggestion.load?.externalId ?? "load",
+        ].join(" for "),
+        scoreLabel: suggestion.row.scoreTotal
+          ? `(score ${formatScore(suggestion.row.scoreTotal)})`
+          : "",
+        status: suggestion.row.status,
+        loadStatus: suggestion.load?.status ?? "unknown",
+        isReservable: staleReason === null,
+        isStale: staleReason !== null,
+        staleReason: staleReason ?? undefined,
+      };
+    },
   );
   const activeReservations: ReservationActionActiveReservation[] = data.loads
     .filter((load) => load.activeReservation)
-    .map((load) => ({
-      reservationId: load.activeReservation?.id ?? "",
-      label: load.referenceNumber ?? load.externalId ?? load.id,
-      expiresAt: formatDate(load.activeReservation?.expiresAt ?? null),
-    }));
+    .map((load) => {
+      const reservation = load.activeReservation;
+      const remainingMs = reservation
+        ? reservation.expiresAt.getTime() - now.getTime()
+        : 0;
+
+      return {
+        reservationId: reservation?.id ?? "",
+        label: load.referenceNumber ?? load.externalId ?? load.id,
+        expiresAt: formatDate(reservation?.expiresAt ?? null),
+        status: reservation?.status,
+        ageLabel: reservation
+          ? formatDuration(now.getTime() - reservation.reservedAt.getTime())
+          : "unknown",
+        countdownLabel: reservation ? `${formatDuration(remainingMs)} remaining` : "unknown",
+        isStale: remainingMs <= HOLD_STALE_REMAINING_MINUTES * MINUTE_MS,
+      };
+    });
+  const reservableSuggestionCount = reservationSuggestions.filter(
+    (suggestion) => suggestion.isReservable,
+  ).length;
+  const staleSuggestionCount = reservationSuggestions.length - reservableSuggestionCount;
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -433,6 +544,11 @@ export default async function DispatcherCockpitPage() {
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
             Dispatcher mutations guarded
           </span>
+          {matchingFreshness ? (
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${matchingIsStale ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+              Matching {matchingIsStale ? "stale" : "fresh"}
+            </span>
+          ) : null}
           <Link
             className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
             href="/"
@@ -447,6 +563,7 @@ export default async function DispatcherCockpitPage() {
           organizationId={data.organization.id}
           suggestions={reservationSuggestions}
           activeReservations={activeReservations}
+          matchingFreshness={matchingFreshness}
         />
       ) : null}
 
@@ -482,42 +599,46 @@ export default async function DispatcherCockpitPage() {
       {data.organization ? (
         <>
           <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-sm text-gray-500">Organization</p>
-              <p className="mt-2 text-xl font-bold text-gray-950">
-                {data.organization.name}
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                {data.organization.slug}
-              </p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-sm text-gray-500">Vehicles</p>
-              <p className="mt-2 text-2xl font-bold text-gray-950">
-                {data.vehicles.length}
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                Fleet records visible to dispatcher matching.
-              </p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-sm text-gray-500">Loads</p>
-              <p className="mt-2 text-2xl font-bold text-gray-950">
-                {data.loads.length}
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                Market opportunities, not deals or shipments.
-              </p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-sm text-gray-500">Latest suggestions</p>
-              <p className="mt-2 text-2xl font-bold text-gray-950">
-                {data.suggestions.length}
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                Persisted LoadSuggestion records from the latest run.
-              </p>
-            </div>
+            <MetricCard
+              label="Organization"
+              value={data.organization.name}
+              description={data.organization.slug}
+            />
+            <MetricCard
+              label="Vehicles"
+              value={data.vehicles.length}
+              description="Fleet records visible to dispatcher matching."
+            />
+            <MetricCard
+              label="Loads"
+              value={data.loads.length}
+              description="Market opportunities, not deals or shipments."
+            />
+            <MetricCard
+              label="Latest suggestions"
+              value={data.suggestions.length}
+              description="Persisted records from the latest run."
+            />
+            <MetricCard
+              label="Active holds"
+              value={data.reservationSummary.activeHolds}
+              description="Unexpired temporary operational holds."
+            />
+            <MetricCard
+              label="Expired holds"
+              value={data.reservationSummary.expiredHolds}
+              description="Historical holds no longer blocking reservations."
+            />
+            <MetricCard
+              label="Reservable suggestions"
+              value={reservableSuggestionCount}
+              description="Fresh suggested loads without active holds."
+            />
+            <MetricCard
+              label="Stale suggestions"
+              value={staleSuggestionCount}
+              description="Unavailable due to stale run, status, or hold state."
+            />
           </section>
 
           <section className="space-y-3">
@@ -541,7 +662,7 @@ export default async function DispatcherCockpitPage() {
               title="Loads"
               description="Loads are market opportunities. Reservation visibility is shown separately from load status."
             />
-            <LoadTable loads={data.loads} />
+            <LoadTable loads={data.loads} now={now} />
           </section>
 
           <section className="space-y-3">
@@ -558,8 +679,12 @@ export default async function DispatcherCockpitPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <StatusBadge status={latestRun.row.status} />
+                      <StatusBadge status={matchingIsStale ? "stale" : "fresh"} />
                       <span className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600">
                         Created {formatDate(latestRun.row.createdAt)}
+                      </span>
+                      <span className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                        {formatDuration(matchingAgeMs ?? 0)} old
                       </span>
                     </div>
                   </div>
@@ -613,7 +738,7 @@ export default async function DispatcherCockpitPage() {
           <section className="space-y-3">
             <SectionHeader
               title="Load Suggestions"
-              description="Ranked persisted recommendations. Scores and snapshots are displayed exactly from Stage 1B persistence."
+              description="Ranked persisted recommendations. Stale matching output is visible but not offered as reservable."
             />
             {data.suggestions.length > 0 ? (
               <div className="grid grid-cols-1 gap-3">
@@ -621,6 +746,7 @@ export default async function DispatcherCockpitPage() {
                   <SuggestionCard
                     key={suggestion.row.id}
                     suggestion={suggestion}
+                    matchingIsStale={matchingIsStale}
                   />
                 ))}
               </div>
