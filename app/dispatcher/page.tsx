@@ -22,6 +22,19 @@ export const dynamic = "force-dynamic";
 const MATCHING_STALE_AFTER_MINUTES = 30;
 const HOLD_STALE_REMAINING_MINUTES = 5;
 const MINUTE_MS = 60 * 1000;
+const operationalVehicleStatuses = ["available", "available_soon"];
+
+type LoadReadinessStatus = "reservable" | "reserved" | "stale" | "unavailable";
+type VehicleReadinessStatus =
+  | "available"
+  | "reserved"
+  | "unavailable"
+  | "stale_matching_context";
+
+type OperationalReadiness<TStatus extends string> = {
+  status: TStatus;
+  reason: string;
+};
 
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
@@ -87,8 +100,75 @@ function loadStopLabel(load: DispatcherLoadView, stopType: "pickup" | "dropoff")
   return locationLabel(stop.location);
 }
 
+function loadReadiness(
+  load: DispatcherLoadView,
+  matchingIsStale: boolean,
+): OperationalReadiness<LoadReadinessStatus> {
+  if (load.activeReservation) {
+    return {
+      status: "reserved",
+      reason: "Active unexpired operational hold blocks reservation.",
+    };
+  }
+
+  if (load.status !== "available") {
+    return {
+      status: "unavailable",
+      reason: `Current load status is ${load.status}.`,
+    };
+  }
+
+  if (matchingIsStale) {
+    return {
+      status: "stale",
+      reason: "Latest matching run is stale for reservation selection.",
+    };
+  }
+
+  return {
+    status: "reservable",
+    reason: "Available load with no active hold and fresh matching context.",
+  };
+}
+
+function vehicleReadiness({
+  vehicle,
+  hasActiveReservation,
+  matchingIsStale,
+}: {
+  vehicle: DispatcherVehicleView;
+  hasActiveReservation: boolean;
+  matchingIsStale: boolean;
+}): OperationalReadiness<VehicleReadinessStatus> {
+  if (hasActiveReservation) {
+    return {
+      status: "reserved",
+      reason: "Vehicle is tied to an active temporary hold.",
+    };
+  }
+
+  if (!operationalVehicleStatuses.includes(vehicle.status)) {
+    return {
+      status: "unavailable",
+      reason: `Current vehicle status is ${vehicle.status}.`,
+    };
+  }
+
+  if (matchingIsStale) {
+    return {
+      status: "stale_matching_context",
+      reason: "Latest matching run is stale for reservation selection.",
+    };
+  }
+
+  return {
+    status: "available",
+    reason: "Vehicle is operationally available in fresh matching context.",
+  };
+}
+
 function statusClass(status: string) {
-  if (["available", "suggested", "completed", "active", "fresh"].includes(status)) {
+  if (["available", "reservable", "suggested", "completed", "active", "fresh"].includes(status)) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
@@ -96,11 +176,11 @@ function statusClass(status: string) {
     return "border-blue-200 bg-blue-50 text-blue-700";
   }
 
-  if (["stale", "expiring"].includes(status)) {
+  if (["stale", "stale_matching_context", "expiring"].includes(status)) {
     return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
-  if (["released", "expired", "cancelled", "dismissed"].includes(status)) {
+  if (["released", "expired", "cancelled", "dismissed", "unavailable"].includes(status)) {
     return "border-gray-200 bg-gray-50 text-gray-600";
   }
 
@@ -164,7 +244,13 @@ function MetricCard({
   );
 }
 
-function VehicleCard({ vehicle }: { vehicle: DispatcherVehicleView }) {
+function VehicleCard({
+  vehicle,
+  readiness,
+}: {
+  vehicle: DispatcherVehicleView;
+  readiness: OperationalReadiness<VehicleReadinessStatus>;
+}) {
   return (
     <article className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -174,8 +260,12 @@ function VehicleCard({ vehicle }: { vehicle: DispatcherVehicleView }) {
             {vehicle.equipmentType ?? "Equipment unknown"}
           </p>
         </div>
-        <StatusBadge status={vehicle.status} />
+        <div className="flex flex-col items-end gap-2">
+          <StatusBadge status={vehicle.status} />
+          <StatusBadge status={readiness.status} />
+        </div>
       </div>
+      <p className="mt-3 text-xs text-gray-500">{readiness.reason}</p>
       <dl className="mt-4 space-y-3 text-sm">
         <div>
           <dt className="font-semibold text-gray-700">Latest location</dt>
@@ -241,7 +331,15 @@ function ReservationState({
   );
 }
 
-function LoadTable({ loads, now }: { loads: DispatcherLoadView[]; now: Date }) {
+function LoadTable({
+  loads,
+  now,
+  matchingIsStale,
+}: {
+  loads: DispatcherLoadView[];
+  now: Date;
+  matchingIsStale: boolean;
+}) {
   if (loads.length === 0) {
     return <EmptyState label="No loads found for this organization." />;
   }
@@ -260,43 +358,55 @@ function LoadTable({ loads, now }: { loads: DispatcherLoadView[]; now: Date }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {loads.map((load) => (
-            <tr key={load.id} className="align-top">
-              <td className="px-4 py-4">
-                <p className="font-semibold text-gray-950">
-                  {load.referenceNumber ?? load.externalId ?? "Load"}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {load.sourceName ?? "Source unknown"} |{" "}
-                  {load.equipmentType ?? "Equipment unknown"}
-                </p>
-              </td>
-              <td className="px-4 py-4 text-gray-600">
-                <p>{loadStopLabel(load, "pickup")}</p>
-                <p className="mt-1 text-xs text-gray-500">
-                  to {loadStopLabel(load, "dropoff")}
-                </p>
-              </td>
-              <td className="px-4 py-4 text-gray-600">
-                <p>Pickup {formatDate(load.pickupStartsAt)}</p>
-                <p className="mt-1 text-xs text-gray-500">
-                  Delivery {formatDate(load.deliveryEndsAt)}
-                </p>
-              </td>
-              <td className="px-4 py-4 text-gray-600">
-                <p>{formatCurrency(load.rateAmount, load.currency)}</p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {formatMiles(load.distanceMiles)}
-                </p>
-              </td>
-              <td className="px-4 py-4">
-                <StatusBadge status={load.status} />
-              </td>
-              <td className="px-4 py-4">
-                <ReservationState load={load} now={now} />
-              </td>
-            </tr>
-          ))}
+          {loads.map((load) => {
+            const readiness = loadReadiness(load, matchingIsStale);
+
+            return (
+              <tr key={load.id} className="align-top">
+                <td className="px-4 py-4">
+                  <p className="font-semibold text-gray-950">
+                    {load.referenceNumber ?? load.externalId ?? "Load"}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {load.sourceName ?? "Source unknown"} |{" "}
+                    {load.equipmentType ?? "Equipment unknown"}
+                  </p>
+                </td>
+                <td className="px-4 py-4 text-gray-600">
+                  <p>{loadStopLabel(load, "pickup")}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    to {loadStopLabel(load, "dropoff")}
+                  </p>
+                </td>
+                <td className="px-4 py-4 text-gray-600">
+                  <p>Pickup {formatDate(load.pickupStartsAt)}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Delivery {formatDate(load.deliveryEndsAt)}
+                  </p>
+                </td>
+                <td className="px-4 py-4 text-gray-600">
+                  <p>{formatCurrency(load.rateAmount, load.currency)}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {formatMiles(load.distanceMiles)}
+                  </p>
+                </td>
+                <td className="px-4 py-4">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge status={load.status} />
+                      <StatusBadge status={readiness.status} />
+                    </div>
+                    <p className="max-w-52 text-xs text-gray-500">
+                      {readiness.reason}
+                    </p>
+                  </div>
+                </td>
+                <td className="px-4 py-4">
+                  <ReservationState load={load} now={now} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -509,6 +619,32 @@ export default async function DispatcherCockpitPage() {
         isStale: matchingIsStale,
       }
     : null;
+  const activeReservationByVehicleId = new Map(
+    data.loads
+      .map((load) => load.activeReservation)
+      .filter((reservation): reservation is NonNullable<typeof reservation> =>
+        Boolean(reservation?.vehicleId),
+      )
+      .map((reservation) => [reservation.vehicleId, reservation]),
+  );
+  const loadReadinessItems = data.loads.map((load) =>
+    loadReadiness(load, matchingIsStale),
+  );
+  const vehicleReadinessItems = data.vehicles.map((vehicle) =>
+    vehicleReadiness({
+      vehicle,
+      hasActiveReservation: activeReservationByVehicleId.has(vehicle.id),
+      matchingIsStale,
+    }),
+  );
+  const readyLoadCount = loadReadinessItems.filter(
+    (readiness) => readiness.status === "reservable",
+  ).length;
+  const blockedLoadCount = data.loads.length - readyLoadCount;
+  const readyVehicleCount = vehicleReadinessItems.filter(
+    (readiness) => readiness.status === "available",
+  ).length;
+  const blockedVehicleCount = data.vehicles.length - readyVehicleCount;
   const editableVehicles: VehicleMutationPanelVehicle[] = data.vehicles.map(
     (vehicle) => ({
       id: vehicle.id,
@@ -696,6 +832,26 @@ export default async function DispatcherCockpitPage() {
               description="Persisted records from the latest run."
             />
             <MetricCard
+              label="Ready loads"
+              value={readyLoadCount}
+              description="Reservable only with fresh matching and no active hold."
+            />
+            <MetricCard
+              label="Blocked loads"
+              value={blockedLoadCount}
+              description="Reserved, stale, or unavailable market opportunities."
+            />
+            <MetricCard
+              label="Ready vehicles"
+              value={readyVehicleCount}
+              description="Available vehicles in fresh matching context."
+            />
+            <MetricCard
+              label="Blocked vehicles"
+              value={blockedVehicleCount}
+              description="Reserved, unavailable, or stale matching context."
+            />
+            <MetricCard
               label="Active holds"
               value={data.reservationSummary.activeHolds}
               description="Unexpired temporary operational holds."
@@ -720,12 +876,20 @@ export default async function DispatcherCockpitPage() {
           <section className="space-y-3">
             <SectionHeader
               title="Vehicles"
-              description="Vehicle identity, equipment, availability, latest known location, and assigned driver."
+              description="Vehicle identity, equipment, availability, latest known location, and read-only operational readiness."
             />
             {data.vehicles.length > 0 ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {data.vehicles.map((vehicle) => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                  <VehicleCard
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                    readiness={vehicleReadiness({
+                      vehicle,
+                      hasActiveReservation: activeReservationByVehicleId.has(vehicle.id),
+                      matchingIsStale,
+                    })}
+                  />
                 ))}
               </div>
             ) : (
@@ -736,9 +900,9 @@ export default async function DispatcherCockpitPage() {
           <section className="space-y-3">
             <SectionHeader
               title="Loads"
-              description="Loads are market opportunities. Reservation visibility is shown separately from load status."
+              description="Loads are market opportunities. Readiness is derived from load state, active holds, and matching freshness."
             />
-            <LoadTable loads={data.loads} now={now} />
+            <LoadTable loads={data.loads} now={now} matchingIsStale={matchingIsStale} />
           </section>
 
           <section className="space-y-3">
