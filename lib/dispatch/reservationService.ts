@@ -123,19 +123,25 @@ function numericValuesChanged(snapshot: string | null, current: string | null) {
   return snapshotNumber !== currentNumber;
 }
 
-function assertSuggestionStillMatchesCurrentState({
+export function getLoadSuggestionReservabilityIssue({
   suggestion,
   load,
   vehicle,
 }: {
   suggestion: LoadSuggestionRow;
-  load: LoadRow;
-  vehicle: VehicleRow;
+  load: LoadRow | null;
+  vehicle: VehicleRow | null;
 }) {
+  if (!load) {
+    return "Load suggestion load is no longer available in this organization.";
+  }
+
+  if (!vehicle) {
+    return "Load suggestion vehicle is no longer available in this organization.";
+  }
+
   if (!reservableVehicleStatuses.includes(vehicle.status)) {
-    throw loadSuggestionNotReservable(
-      "Load suggestion vehicle is no longer operationally reservable.",
-    );
+    return "Load suggestion vehicle is no longer operationally reservable.";
   }
 
   if (
@@ -143,9 +149,7 @@ function assertSuggestionStillMatchesCurrentState({
     vehicle.equipmentType &&
     load.equipmentType !== vehicle.equipmentType
   ) {
-    throw loadSuggestionNotReservable(
-      "Load suggestion vehicle no longer matches the load equipment.",
-    );
+    return "Load suggestion vehicle no longer matches the load equipment.";
   }
 
   const loadSnapshot = suggestion.loadSnapshot;
@@ -193,9 +197,7 @@ function assertSuggestionStillMatchesCurrentState({
   ];
 
   if (loadTextChecks.some(([, snapshot, current]) => valuesChanged(snapshot, current))) {
-    throw loadSuggestionNotReservable(
-      "Load suggestion is stale because the load changed after matching.",
-    );
+    return "Load suggestion is stale because the load changed after matching.";
   }
 
   if (
@@ -203,15 +205,11 @@ function assertSuggestionStillMatchesCurrentState({
       numericValuesChanged(snapshot, current),
     )
   ) {
-    throw loadSuggestionNotReservable(
-      "Load suggestion is stale because the load changed after matching.",
-    );
+    return "Load suggestion is stale because the load changed after matching.";
   }
 
   if (loadDateChecks.some(([, snapshot, current]) => valuesChanged(snapshot, current))) {
-    throw loadSuggestionNotReservable(
-      "Load suggestion is stale because the load timing changed after matching.",
-    );
+    return "Load suggestion is stale because the load timing changed after matching.";
   }
 
   const vehicleChecks: Array<[string, string | null, string | null]> = [
@@ -229,9 +227,25 @@ function assertSuggestionStillMatchesCurrentState({
   ];
 
   if (vehicleChecks.some(([, snapshot, current]) => valuesChanged(snapshot, current))) {
-    throw loadSuggestionNotReservable(
-      "Load suggestion is stale because the vehicle changed after matching.",
-    );
+    return "Load suggestion is stale because the vehicle changed after matching.";
+  }
+
+  return null;
+}
+
+function assertSuggestionStillMatchesCurrentState({
+  suggestion,
+  load,
+  vehicle,
+}: {
+  suggestion: LoadSuggestionRow;
+  load: LoadRow;
+  vehicle: VehicleRow;
+}) {
+  const issue = getLoadSuggestionReservabilityIssue({ suggestion, load, vehicle });
+
+  if (issue) {
+    throw loadSuggestionNotReservable(issue);
   }
 }
 

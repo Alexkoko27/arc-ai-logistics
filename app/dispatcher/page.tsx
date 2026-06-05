@@ -16,6 +16,7 @@ import {
   type DispatcherVehicleView,
   getDispatcherCockpitData,
 } from "@/lib/dispatch/cockpitQueries";
+import { getLoadSuggestionReservabilityIssue } from "@/lib/dispatch/reservationService";
 
 export const dynamic = "force-dynamic";
 
@@ -617,7 +618,11 @@ function staleReasonForSuggestion({
     return `load is ${suggestion.load?.status ?? "unavailable"}`;
   }
   if (suggestion.activeReservation) return "load already has an active hold";
-  return null;
+  return getLoadSuggestionReservabilityIssue({
+    suggestion: suggestion.row,
+    load: suggestion.load,
+    vehicle: suggestion.vehicle,
+  });
 }
 
 export default async function DispatcherCockpitPage() {
@@ -627,15 +632,16 @@ export default async function DispatcherCockpitPage() {
   const matchingAgeMs = latestRun
     ? now.getTime() - latestRun.row.createdAt.getTime()
     : null;
+  const matchingIsCompleted = latestRun?.row.status === "completed";
   const matchingIsStale =
     matchingAgeMs !== null &&
     matchingAgeMs > MATCHING_STALE_AFTER_MINUTES * MINUTE_MS;
-  const matchingIsReady = latestRun !== null && !matchingIsStale;
+  const matchingIsReady = latestRun !== null && matchingIsCompleted && !matchingIsStale;
   const matchingFreshness = latestRun
     ? {
         generatedAtLabel: formatDate(latestRun.row.createdAt),
         ageLabel: `${formatDuration(matchingAgeMs ?? 0)} old`,
-        isStale: matchingIsStale,
+        isStale: !matchingIsReady,
       }
     : null;
   const activeReservationByVehicleId = new Map(
@@ -781,8 +787,8 @@ export default async function DispatcherCockpitPage() {
             Dispatcher mutations guarded
           </span>
           {matchingFreshness ? (
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${matchingIsStale ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-              Matching {matchingIsStale ? "stale" : "fresh"}
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${matchingIsReady ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+              Matching {matchingIsReady ? "fresh" : "stale"}
             </span>
           ) : null}
           <Link
@@ -952,7 +958,7 @@ export default async function DispatcherCockpitPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <StatusBadge status={latestRun.row.status} />
-                      <StatusBadge status={matchingIsStale ? "stale" : "fresh"} />
+                      <StatusBadge status={matchingIsReady ? "fresh" : "stale"} />
                       <span className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600">
                         Created {formatDate(latestRun.row.createdAt)}
                       </span>

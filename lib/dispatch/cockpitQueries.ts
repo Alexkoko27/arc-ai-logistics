@@ -435,8 +435,20 @@ async function getSuggestions(
       vehicle: vehicles,
     })
     .from(loadSuggestions)
-    .leftJoin(loads, eq(loadSuggestions.loadId, loads.id))
-    .leftJoin(vehicles, eq(loadSuggestions.vehicleId, vehicles.id))
+    .leftJoin(
+      loads,
+      and(
+        eq(loadSuggestions.loadId, loads.id),
+        eq(loads.organizationId, organizationId),
+      ),
+    )
+    .leftJoin(
+      vehicles,
+      and(
+        eq(loadSuggestions.vehicleId, vehicles.id),
+        eq(vehicles.organizationId, organizationId),
+      ),
+    )
     .where(
       and(
         eq(loadSuggestions.organizationId, organizationId),

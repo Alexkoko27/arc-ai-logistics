@@ -7,6 +7,7 @@ import {
   locations,
 } from "../db/schema";
 import { assertDevDispatcherDatabaseTarget } from "./devDatabaseGuard";
+import { expireDispatcherReservations } from "./reservationService";
 import type {
   DispatcherCreateLoadInput,
   DispatcherEditLoadInput,
@@ -383,6 +384,7 @@ function activeReservationPredicate(organizationId: string, loadId: string) {
     where organization_id = ${organizationId}
       and load_id = ${loadId}
       and status = 'active'
+      and expires_at > now()
   )`;
 }
 
@@ -396,6 +398,7 @@ async function getActiveReservation(db: MutationDb, organizationId: string, load
           eq(loadReservations.organizationId, organizationId),
           eq(loadReservations.loadId, loadId),
           eq(loadReservations.status, "active"),
+          sql`${loadReservations.expiresAt} > now()`,
         ),
       )
       .limit(1)
@@ -662,6 +665,12 @@ export async function editDispatcherLoad(
   db: Db = getDb(),
 ): Promise<DispatcherLoadMutationResult> {
   assertDevDispatcherDatabaseTarget("edit dispatcher load");
+
+  await expireDispatcherReservations({
+    db,
+    organizationId: input.organizationId,
+    loadId: input.loadId,
+  });
 
   return db.transaction((tx) => editDispatcherLoadWithDb(tx, input));
 }

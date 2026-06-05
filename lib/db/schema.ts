@@ -394,6 +394,11 @@ export const loadReservations = pgTable(
     )
       .on(table.loadId)
       .where(sql`${table.status} = 'active'`),
+    activeSuggestionReservationIdx: uniqueIndex(
+      "load_reservations_active_suggestion_idx",
+    )
+      .on(table.loadSuggestionId)
+      .where(sql`${table.status} = 'active'`),
     loadIdx: index("load_reservations_load_id_idx").on(table.loadId),
     organizationIdx: index("load_reservations_organization_id_idx").on(
       table.organizationId,
