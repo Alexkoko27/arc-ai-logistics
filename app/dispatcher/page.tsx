@@ -22,12 +22,12 @@ import {
   buildDispatcherAttentionItems,
   buildMatchingExplanationItems,
   buildOperationalFreshnessItems,
+  buildOperationalReviewPriorityGroups,
   loadReadiness,
   matchingFreshnessSnapshot,
   staleReasonForSuggestion,
   vehicleReadiness,
   type AttentionTone,
-  type DecisionSupportSignal,
   type DispatcherAttentionItem,
   type ExplanationTone,
   type FreshnessState,
@@ -36,6 +36,7 @@ import {
   type MatchingFreshnessSnapshot,
   type OperationalFreshnessItem,
   type OperationalReadiness,
+  type OperationalReviewPriorityGroup,
   type VehicleReadinessStatus,
 } from "@/lib/dispatch/dispatcherVisibility";
 
@@ -294,40 +295,57 @@ function DispatcherAttentionSection({
 }
 
 function DecisionSupportSection({
-  items,
+  groups,
 }: {
-  items: DecisionSupportSignal[];
+  groups: OperationalReviewPriorityGroup[];
 }) {
   return (
     <section className="space-y-3">
       <SectionHeader
         title="Decision Support"
-        description="Read-only planning signals that explain what needs review first and why."
+        description="Read-only planning signals grouped by review priority and confidence context."
       />
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {items.map((item) => (
-          <article
-            key={item.id}
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+        {groups.map((group) => (
+          <div
+            key={group.id}
             className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
           >
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  {item.priority}
-                </p>
-                <h3 className="mt-1 font-bold text-gray-950">{item.title}</h3>
-                <p className="mt-1 text-sm text-gray-600">{item.summary}</p>
-              </div>
-              <span
-                className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${attentionToneClass(
-                  item.tone,
-                )}`}
-              >
-                {item.priority}
-              </span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {group.id}
+              </p>
+              <h3 className="mt-1 font-bold text-gray-950">{group.title}</h3>
+              <p className="mt-1 text-sm leading-6 text-gray-600">
+                {group.description}
+              </p>
             </div>
-            <p className="mt-3 text-xs leading-5 text-gray-500">{item.reason}</p>
-          </article>
+            <div className="mt-4 space-y-3">
+              {group.items.map((item) => (
+                <article
+                  key={item.id}
+                  className="rounded-md border border-gray-100 bg-gray-50 p-3"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h4 className="font-semibold text-gray-950">{item.title}</h4>
+                      <p className="mt-1 text-sm text-gray-600">{item.summary}</p>
+                    </div>
+                    <span
+                      className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${attentionToneClass(
+                        item.tone,
+                      )}`}
+                    >
+                      {item.priority}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-gray-500">
+                    {item.reason}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </section>
@@ -933,6 +951,9 @@ export default async function DispatcherCockpitPage() {
     reservationSuggestions,
     vehicleReadinessItems,
   });
+  const decisionSupportGroups = buildOperationalReviewPriorityGroups(
+    decisionSupportSignals,
+  );
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -1080,7 +1101,7 @@ export default async function DispatcherCockpitPage() {
             />
           </section>
 
-          <DecisionSupportSection items={decisionSupportSignals} />
+          <DecisionSupportSection groups={decisionSupportGroups} />
 
           <DispatcherAttentionSection items={attentionItems} />
 

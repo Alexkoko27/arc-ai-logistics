@@ -72,6 +72,12 @@ export type DecisionSupportSignal = {
   summary: string;
   reason: string;
 };
+export type OperationalReviewPriorityGroup = {
+  id: DecisionSupportSignal["priority"];
+  title: string;
+  description: string;
+  items: DecisionSupportSignal[];
+};
 
 type ReservationVisibilityItem = {
   reservationId: string;
@@ -204,6 +210,21 @@ function confidencePriority(
   if (matchingFreshness.state === "aging") return "monitor";
 
   return "high attention";
+}
+
+function priorityRank(priority: DecisionSupportSignal["priority"]) {
+  if (priority === "review first") return 0;
+  if (priority === "high attention") return 1;
+  return 2;
+}
+
+function decisionSignalRank(signal: DecisionSupportSignal) {
+  if (signal.id === "hold-review") return 0;
+  if (signal.id === "matching-confidence") return 1;
+  if (signal.id === "suggestion-review") return 2;
+  if (signal.id === "load-review") return 3;
+  if (signal.id === "vehicle-review") return 4;
+  return 5;
 }
 
 export function loadReadiness({
@@ -668,5 +689,45 @@ export function buildDispatcherDecisionSupportSignals({
     });
   }
 
-  return signals.slice(0, 5);
+  return [...signals]
+    .sort(
+      (left, right) =>
+        priorityRank(left.priority) - priorityRank(right.priority) ||
+        decisionSignalRank(left) - decisionSignalRank(right),
+    )
+    .slice(0, 5);
+}
+
+export function buildOperationalReviewPriorityGroups(
+  signals: DecisionSupportSignal[],
+) {
+  const groupDefinitions: Array<
+    Omit<OperationalReviewPriorityGroup, "items">
+  > = [
+    {
+      id: "review first",
+      title: "Review First",
+      description:
+        "Highest planning attention based on freshness confidence, temporary holds, or unavailable suggestions.",
+    },
+    {
+      id: "high attention",
+      title: "High Attention",
+      description:
+        "Planning review signals visible before lower-confidence matching context is treated as current.",
+    },
+    {
+      id: "monitor",
+      title: "Monitor",
+      description:
+        "Lower-pressure planning signals that remain useful for operational awareness.",
+    },
+  ];
+
+  return groupDefinitions
+    .map((group) => ({
+      ...group,
+      items: signals.filter((signal) => signal.priority === group.id),
+    }))
+    .filter((group) => group.items.length > 0);
 }
