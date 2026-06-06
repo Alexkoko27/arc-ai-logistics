@@ -153,7 +153,7 @@ function matchingFreshnessSnapshot({
       tone: "gray",
       ageLabel: `${formatDuration(ageMs)} old`,
       confidenceLabel: "Matching run not ready",
-      detail: "Matching run has not completed, so freshness age is informational only.",
+      detail: "Matching run is not ready, so freshness age is informational only.",
       generatedAtLabel: formatDate(latestRun.row.createdAt),
       staleDurationLabel: null,
     };
@@ -313,13 +313,15 @@ function statusClass(status: string) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const label = status === "completed" ? "reviewed" : status.replaceAll("_", " ");
+
   return (
     <span
       className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${statusClass(
         status,
       )}`}
     >
-      {status.replaceAll("_", " ")}
+      {label}
     </span>
   );
 }
@@ -549,9 +551,9 @@ function VehicleCard({
           </dd>
         </div>
         <div>
-          <dt className="font-semibold text-gray-700">Assigned driver</dt>
+          <dt className="font-semibold text-gray-700">Driver contact</dt>
           <dd className="mt-1 text-gray-600">
-            {vehicle.assignedDriver?.name ?? "No active assignment"}
+            {vehicle.assignedDriver?.name ?? "No active driver contact"}
           </dd>
         </div>
         {vehicle.expectedAvailableAt ? (
@@ -1319,8 +1321,8 @@ export default async function DispatcherCockpitPage() {
           <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
             Operations view for Stage 1B vehicles, loads, matching runs, load
             suggestions, and load reservations, with dispatcher-only load and
-            vehicle resource mutations. Load, LoadSuggestion, LoadReservation,
-            Deal, Shipment, Dispatch, and Settlement remain separate concepts.
+            vehicle resource updates. Planning records remain separate from
+            downstream operational domains.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1403,7 +1405,7 @@ export default async function DispatcherCockpitPage() {
             <MetricCard
               label="Loads"
               value={data.loads.length}
-              description="Market opportunities, not deals or shipments."
+              description="Market opportunities for planning review."
             />
             <MetricCard
               label="Latest suggestions"

@@ -320,8 +320,8 @@ export default function LoadMutationPanel({
         </h2>
         <p className="mt-1 text-sm leading-6 text-blue-800">
           Stage 1D-B mutates only Load and pickup/dropoff LoadStops. Status,
-          reservation, vehicle, deal, shipment, dispatch, and settlement flows are
-          intentionally excluded.
+          reservation, vehicle, and downstream operational flows are intentionally
+          excluded.
         </p>
       </div>
 

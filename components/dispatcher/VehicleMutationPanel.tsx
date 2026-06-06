@@ -238,8 +238,8 @@ export default function VehicleMutationPanel({
           Vehicle Create/Edit Operations
         </h2>
         <p className="mt-1 text-sm leading-6 text-emerald-800">
-          Stage 1D-C mutates only Vehicle operational resource records. Driver
-          assignment, reservation, dispatch, shipment, deal, settlement, GPS, and
+          Stage 1D-C mutates only Vehicle operational resource records.
+          Reservation, location telemetry, downstream operational flows, and
           rematching flows are intentionally excluded.
         </p>
       </div>

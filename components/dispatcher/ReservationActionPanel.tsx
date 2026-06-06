@@ -157,8 +157,8 @@ export default function ReservationActionPanel({
           </h2>
           <p className="mt-1 text-sm leading-6 text-violet-800">
             Stage 1D-E shows temporary operational hold freshness and matching
-            suggestion age. Deal, shipment, dispatch, driver assignment,
-            settlement, and payment flows are intentionally excluded.
+            suggestion age. Downstream operational flows and driver response
+            flows are intentionally excluded.
           </p>
           {matchingFreshness ? (
             <p className="mt-2 text-xs font-semibold text-violet-900">
@@ -278,8 +278,8 @@ export default function ReservationActionPanel({
           <div>
             <h3 className="font-bold text-gray-950">Release Reservation</h3>
             <p className="mt-1 text-sm text-gray-600">
-              Release an active temporary hold without creating shipment or
-              dispatch execution state.
+              Release an active temporary hold without creating downstream
+              operational state.
             </p>
           </div>
           <label className="space-y-1 text-sm">
