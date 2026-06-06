@@ -64,6 +64,14 @@ export type OperationalFreshnessItem = {
   detail: string;
   confidence: string;
 };
+export type DecisionSupportSignal = {
+  id: string;
+  tone: AttentionTone;
+  priority: "review first" | "high attention" | "monitor";
+  title: string;
+  summary: string;
+  reason: string;
+};
 
 type ReservationVisibilityItem = {
   reservationId: string;
@@ -184,6 +192,18 @@ function matchingContextReason(matchingFreshnessState: FreshnessState) {
 
 function suggestionNeedsReview(suggestion: SuggestionVisibilityItem) {
   return Boolean(suggestion.staleReason);
+}
+
+function confidencePriority(
+  matchingFreshness: MatchingFreshnessSnapshot,
+): DecisionSupportSignal["priority"] {
+  if (["stale", "pending", "unavailable"].includes(matchingFreshness.state)) {
+    return "review first";
+  }
+
+  if (matchingFreshness.state === "aging") return "monitor";
+
+  return "high attention";
 }
 
 export function loadReadiness({
@@ -551,4 +571,102 @@ export function buildOperationalFreshnessItems({
           : "No active hold availability pressure.",
     },
   ] satisfies OperationalFreshnessItem[];
+}
+
+export function buildDispatcherDecisionSupportSignals({
+  activeReservations,
+  loadReadinessItems,
+  matchingFreshness,
+  reservationSuggestions,
+  vehicleReadinessItems,
+}: {
+  activeReservations: ReservationVisibilityItem[];
+  loadReadinessItems: OperationalReadiness<LoadReadinessStatus>[];
+  matchingFreshness: MatchingFreshnessSnapshot;
+  reservationSuggestions: SuggestionVisibilityItem[];
+  vehicleReadinessItems: OperationalReadiness<VehicleReadinessStatus>[];
+}) {
+  const signals: DecisionSupportSignal[] = [];
+  const expiringHoldCount = activeReservations.filter((item) => item.isStale).length;
+  const suggestionReviewCount = reservationSuggestions.filter(suggestionNeedsReview).length;
+  const matchingReviewLoadCount = loadReadinessItems.filter((item) =>
+    ["stale", "matching_review"].includes(item.status),
+  ).length;
+  const unavailableLoadCount = loadReadinessItems.filter(
+    (item) => item.status === "unavailable",
+  ).length;
+  const matchingReviewVehicleCount = vehicleReadinessItems.filter((item) =>
+    ["stale_matching_context", "matching_review"].includes(item.status),
+  ).length;
+  const unavailableVehicleCount = vehicleReadinessItems.filter(
+    (item) => item.status === "unavailable",
+  ).length;
+
+  if (["stale", "pending", "unavailable", "aging"].includes(matchingFreshness.state)) {
+    signals.push({
+      id: "matching-confidence",
+      tone: matchingFreshness.tone === "amber" ? "amber" : "gray",
+      priority: confidencePriority(matchingFreshness),
+      title: "Matching confidence",
+      summary: matchingContextLabel(matchingFreshness.state),
+      reason: `${matchingFreshness.detail} ${matchingFreshness.confidenceLabel}.`,
+    });
+  }
+
+  if (expiringHoldCount > 0) {
+    signals.push({
+      id: "hold-review",
+      tone: "amber",
+      priority: "review first",
+      title: "Temporary hold review",
+      summary: `${expiringHoldCount} active holds near expiration`,
+      reason: "Review hold availability first because expiring holds can change reservability soon.",
+    });
+  }
+
+  if (suggestionReviewCount > 0) {
+    signals.push({
+      id: "suggestion-review",
+      tone: matchingFreshness.state === "stale" ? "amber" : "gray",
+      priority: matchingFreshness.state === "stale" ? "review first" : "high attention",
+      title: "Suggestion review",
+      summary: `${suggestionReviewCount} suggestions unavailable for reservation review`,
+      reason: "Review suggested matches with readiness, hold, status, or matching-context issues.",
+    });
+  }
+
+  if (matchingReviewLoadCount > 0 || unavailableLoadCount > 0) {
+    signals.push({
+      id: "load-review",
+      tone: matchingReviewLoadCount > 0 ? "amber" : "gray",
+      priority: matchingReviewLoadCount > 0 ? "high attention" : "monitor",
+      title: "Load planning status",
+      summary: `${matchingReviewLoadCount} matching review, ${unavailableLoadCount} unavailable`,
+      reason: "Review loads blocked by matching context separately from loads unavailable by current load state.",
+    });
+  }
+
+  if (matchingReviewVehicleCount > 0 || unavailableVehicleCount > 0) {
+    signals.push({
+      id: "vehicle-review",
+      tone: matchingReviewVehicleCount > 0 ? "amber" : "blue",
+      priority: matchingReviewVehicleCount > 0 ? "high attention" : "monitor",
+      title: "Vehicle planning status",
+      summary: `${matchingReviewVehicleCount} matching review, ${unavailableVehicleCount} unavailable`,
+      reason: "Review vehicles with matching-context issues separately from vehicles unavailable by current vehicle state.",
+    });
+  }
+
+  if (signals.length === 0) {
+    signals.push({
+      id: "current-planning-context",
+      tone: "blue",
+      priority: "monitor",
+      title: "Current planning context",
+      summary: "No elevated decision-support signals",
+      reason: "Current freshness, readiness, suggestions, and temporary holds do not require elevated review.",
+    });
+  }
+
+  return signals.slice(0, 5);
 }

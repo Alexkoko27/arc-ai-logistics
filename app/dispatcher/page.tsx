@@ -18,6 +18,7 @@ import {
 } from "@/lib/dispatch/cockpitQueries";
 import {
   MATCHING_STALE_AFTER_MINUTES,
+  buildDispatcherDecisionSupportSignals,
   buildDispatcherAttentionItems,
   buildMatchingExplanationItems,
   buildOperationalFreshnessItems,
@@ -26,6 +27,7 @@ import {
   staleReasonForSuggestion,
   vehicleReadiness,
   type AttentionTone,
+  type DecisionSupportSignal,
   type DispatcherAttentionItem,
   type ExplanationTone,
   type FreshnessState,
@@ -287,6 +289,47 @@ function DispatcherAttentionSection({
       ) : (
         <EmptyState label="No current attention items." />
       )}
+    </section>
+  );
+}
+
+function DecisionSupportSection({
+  items,
+}: {
+  items: DecisionSupportSignal[];
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader
+        title="Decision Support"
+        description="Read-only planning signals that explain what needs review first and why."
+      />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {items.map((item) => (
+          <article
+            key={item.id}
+            className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  {item.priority}
+                </p>
+                <h3 className="mt-1 font-bold text-gray-950">{item.title}</h3>
+                <p className="mt-1 text-sm text-gray-600">{item.summary}</p>
+              </div>
+              <span
+                className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${attentionToneClass(
+                  item.tone,
+                )}`}
+              >
+                {item.priority}
+              </span>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-gray-500">{item.reason}</p>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
@@ -883,6 +926,13 @@ export default async function DispatcherCockpitPage() {
     suggestionReviewCount,
     suggestionCount: reservationSuggestions.length,
   });
+  const decisionSupportSignals = buildDispatcherDecisionSupportSignals({
+    activeReservations,
+    loadReadinessItems,
+    matchingFreshness: matchingFreshnessSnapshotValue,
+    reservationSuggestions,
+    vehicleReadinessItems,
+  });
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -1029,6 +1079,8 @@ export default async function DispatcherCockpitPage() {
               description="Unavailable due to readiness, hold, status, or matching context."
             />
           </section>
+
+          <DecisionSupportSection items={decisionSupportSignals} />
 
           <DispatcherAttentionSection items={attentionItems} />
 
