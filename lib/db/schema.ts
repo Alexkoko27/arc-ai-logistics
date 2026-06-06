@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
@@ -91,6 +92,10 @@ export const vehicles = pgTable(
     organizationUnitIdx: uniqueIndex("vehicles_org_unit_number_idx").on(
       table.organizationId,
       table.unitNumber,
+    ),
+    statusCheck: check(
+      "vehicles_status_check",
+      sql`${table.status} IN ('available', 'busy', 'available_soon', 'offline', 'maintenance', 'driver_rest', 'inactive')`,
     ),
   }),
 );
@@ -328,6 +333,10 @@ export const matchingRuns = pgTable(
     organizationIdx: index("matching_runs_organization_id_idx").on(
       table.organizationId,
     ),
+    statusCheck: check(
+      "matching_runs_status_check",
+      sql`${table.status} IN ('pending', 'running', 'completed')`,
+    ),
   }),
 );
 
@@ -386,6 +395,10 @@ export const loadSuggestions = pgTable(
       foreignColumns: [vehicles.id, vehicles.organizationId],
       name: "load_suggestions_vehicle_org_fk",
     }),
+    statusCheck: check(
+      "load_suggestions_status_check",
+      sql`${table.status} IN ('suggested', 'reserved')`,
+    ),
   }),
 );
 
