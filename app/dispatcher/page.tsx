@@ -119,7 +119,17 @@ function statusClass(status: string) {
     return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
-  if (["released", "expired", "cancelled", "dismissed", "unavailable", "pending"].includes(status)) {
+  if (
+    [
+      "released",
+      "expired",
+      "cancelled",
+      "dismissed",
+      "unavailable",
+      "pending",
+      "matching_review",
+    ].includes(status)
+  ) {
     return "border-gray-200 bg-gray-50 text-gray-600";
   }
 

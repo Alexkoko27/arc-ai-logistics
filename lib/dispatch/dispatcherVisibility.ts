@@ -13,11 +13,13 @@ const operationalVehicleStatuses = ["available", "available_soon"];
 export type LoadReadinessStatus =
   | "reservable"
   | "reserved"
+  | "matching_review"
   | "stale"
   | "unavailable";
 export type VehicleReadinessStatus =
   | "available"
   | "reserved"
+  | "matching_review"
   | "unavailable"
   | "stale_matching_context";
 
@@ -164,6 +166,7 @@ export function matchingFreshnessSnapshot({
 function matchingContextLabel(matchingFreshnessState: FreshnessState) {
   if (matchingFreshnessState === "stale") return "Stale matching";
   if (matchingFreshnessState === "pending") return "Matching review pending";
+  if (matchingFreshnessState === "unavailable") return "Matching context unavailable";
   return "Matching review";
 }
 
@@ -210,7 +213,7 @@ export function loadReadiness({
 
   if (!matchingIsReady) {
     return {
-      status: "stale",
+      status: matchingFreshnessState === "stale" ? "stale" : "matching_review",
       reason: matchingContextReason(matchingFreshnessState),
     };
   }
@@ -255,7 +258,10 @@ export function vehicleReadiness({
 
   if (!matchingIsReady) {
     return {
-      status: "stale_matching_context",
+      status:
+        matchingFreshnessState === "stale"
+          ? "stale_matching_context"
+          : "matching_review",
       reason: matchingContextReason(matchingFreshnessState),
     };
   }
@@ -340,7 +346,7 @@ export function buildDispatcherAttentionItems({
       id: `load:${load.id}`,
       tone: readiness.status === "stale" ? "amber" : "gray",
       label:
-        readiness.status === "stale"
+        readiness.status === "stale" || readiness.status === "matching_review"
           ? matchingContextLabel(matchingFreshnessState)
           : "Unavailable for reservation",
       title: load.referenceNumber ?? load.externalId ?? load.id,
@@ -359,7 +365,8 @@ export function buildDispatcherAttentionItems({
       id: `vehicle:${vehicle.id}`,
       tone: readiness.status === "stale_matching_context" ? "amber" : "blue",
       label:
-        readiness.status === "stale_matching_context"
+        readiness.status === "stale_matching_context" ||
+        readiness.status === "matching_review"
           ? matchingContextLabel(matchingFreshnessState)
           : "Needs review",
       title: vehicle.unitNumber,
@@ -406,10 +413,7 @@ export function buildMatchingExplanationItems({
       id: "matching-context",
       tone: "amber",
       subject: "Matching context",
-      label:
-        matchingFreshnessState === "stale"
-          ? "Stale context"
-          : "Matching review pending",
+      label: matchingContextLabel(matchingFreshnessState),
       message: `${matchingContextReason(
         matchingFreshnessState,
       )} Reservation readiness requires review.`,
@@ -438,7 +442,13 @@ export function buildMatchingExplanationItems({
       id: `load:${load.id}`,
       tone: readiness.status === "stale" ? "amber" : "gray",
       subject: load.referenceNumber ?? load.externalId ?? load.id,
-      label: readiness.status === "reserved" ? "Temporary hold" : readiness.status,
+      label:
+        readiness.status === "reserved"
+          ? "Temporary hold"
+          : readiness.status === "stale" ||
+              readiness.status === "matching_review"
+            ? matchingContextLabel(matchingFreshnessState)
+            : readiness.status,
       message: readiness.reason,
       source: "load readiness",
     });
@@ -453,8 +463,9 @@ export function buildMatchingExplanationItems({
       tone: readiness.status === "stale_matching_context" ? "amber" : "blue",
       subject: vehicle.unitNumber,
       label:
-        readiness.status === "stale_matching_context"
-          ? "Stale context"
+        readiness.status === "stale_matching_context" ||
+        readiness.status === "matching_review"
+          ? matchingContextLabel(matchingFreshnessState)
           : readiness.status,
       message: readiness.reason,
       source: "vehicle readiness",

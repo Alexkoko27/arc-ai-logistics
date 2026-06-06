@@ -79,7 +79,7 @@ export default function ReservationActionPanel({
     () => suggestions.filter((suggestion) => suggestion.isReservable),
     [suggestions],
   );
-  const staleSuggestionCount = suggestions.length - reservableSuggestions.length;
+  const unavailableSuggestionCount = suggestions.length - reservableSuggestions.length;
   const staleHoldCount = activeReservations.filter(
     (reservation) => reservation.isStale,
   ).length;
@@ -179,9 +179,9 @@ export default function ReservationActionPanel({
               {staleHoldCount} stale holds
             </span>
           ) : null}
-          {staleSuggestionCount > 0 ? (
+          {unavailableSuggestionCount > 0 ? (
             <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-gray-600">
-              {staleSuggestionCount} unavailable
+              {unavailableSuggestionCount} unavailable
             </span>
           ) : null}
         </div>
@@ -249,7 +249,7 @@ export default function ReservationActionPanel({
               </p>
             </div>
           ) : null}
-          {staleSuggestionCount > 0 ? (
+          {unavailableSuggestionCount > 0 ? (
             <div className="rounded-md border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
               <p className="font-semibold text-gray-700">Unavailable suggestions</p>
               <ul className="mt-2 space-y-1">
