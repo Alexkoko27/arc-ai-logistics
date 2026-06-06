@@ -118,6 +118,10 @@ export const drivers = pgTable(
     organizationIdx: index("drivers_organization_id_idx").on(
       table.organizationId,
     ),
+    idOrganizationIdx: uniqueIndex("drivers_id_organization_id_idx").on(
+      table.id,
+      table.organizationId,
+    ),
   }),
 );
 
@@ -145,6 +149,21 @@ export const driverVehicleAssignments = pgTable(
     vehicleIdx: index("driver_vehicle_assignments_vehicle_id_idx").on(
       table.vehicleId,
     ),
+    activeVehicleIdx: uniqueIndex(
+      "driver_vehicle_assignments_active_vehicle_idx",
+    )
+      .on(table.vehicleId)
+      .where(sql`${table.status} = 'active'`),
+    driverOrganizationFk: foreignKey({
+      columns: [table.driverId, table.organizationId],
+      foreignColumns: [drivers.id, drivers.organizationId],
+      name: "driver_vehicle_assignments_driver_org_fk",
+    }),
+    vehicleOrganizationFk: foreignKey({
+      columns: [table.vehicleId, table.organizationId],
+      foreignColumns: [vehicles.id, vehicles.organizationId],
+      name: "driver_vehicle_assignments_vehicle_org_fk",
+    }),
   }),
 );
 
