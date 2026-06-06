@@ -161,13 +161,37 @@ export function matchingFreshnessSnapshot({
   };
 }
 
+function matchingContextLabel(matchingFreshnessState: FreshnessState) {
+  if (matchingFreshnessState === "stale") return "Stale matching";
+  if (matchingFreshnessState === "pending") return "Matching review pending";
+  return "Matching review";
+}
+
+function matchingContextReason(matchingFreshnessState: FreshnessState) {
+  if (matchingFreshnessState === "stale") {
+    return "Fresh matching context is required for reservation selection.";
+  }
+
+  if (matchingFreshnessState === "pending") {
+    return "Matching context is not ready for reservation selection.";
+  }
+
+  return "Matching context is unavailable for reservation selection.";
+}
+
+function suggestionNeedsReview(suggestion: SuggestionVisibilityItem) {
+  return Boolean(suggestion.staleReason);
+}
+
 export function loadReadiness({
   load,
   matchingIsReady,
+  matchingFreshnessState,
   hasReservableSuggestion,
 }: {
   load: DispatcherLoadView;
   matchingIsReady: boolean;
+  matchingFreshnessState: FreshnessState;
   hasReservableSuggestion: boolean;
 }): OperationalReadiness<LoadReadinessStatus> {
   if (load.activeReservation) {
@@ -187,7 +211,7 @@ export function loadReadiness({
   if (!matchingIsReady) {
     return {
       status: "stale",
-      reason: "Fresh matching context is required for reservation selection.",
+      reason: matchingContextReason(matchingFreshnessState),
     };
   }
 
@@ -208,10 +232,12 @@ export function vehicleReadiness({
   vehicle,
   hasActiveReservation,
   matchingIsReady,
+  matchingFreshnessState,
 }: {
   vehicle: DispatcherVehicleView;
   hasActiveReservation: boolean;
   matchingIsReady: boolean;
+  matchingFreshnessState: FreshnessState;
 }): OperationalReadiness<VehicleReadinessStatus> {
   if (hasActiveReservation) {
     return {
@@ -230,7 +256,7 @@ export function vehicleReadiness({
   if (!matchingIsReady) {
     return {
       status: "stale_matching_context",
-      reason: "Fresh matching context is required for reservation selection.",
+      reason: matchingContextReason(matchingFreshnessState),
     };
   }
 
@@ -243,11 +269,13 @@ export function vehicleReadiness({
 export function staleReasonForSuggestion({
   suggestion,
   matchingIsReady,
+  matchingFreshnessState,
 }: {
   suggestion: DispatcherSuggestionView;
   matchingIsReady: boolean;
+  matchingFreshnessState: FreshnessState;
 }) {
-  if (!matchingIsReady) return "matching context is stale or unavailable";
+  if (!matchingIsReady) return matchingContextReason(matchingFreshnessState);
   if (suggestion.row.status !== "suggested") return `suggestion is ${suggestion.row.status}`;
   if (suggestion.load?.status !== "available") {
     return `load is ${suggestion.load?.status ?? "unavailable"}`;
@@ -266,6 +294,7 @@ export function buildDispatcherAttentionItems({
   data,
   loadReadinessItems,
   matchingIsReady,
+  matchingFreshnessState,
   reservationSuggestions,
   vehicleReadinessItems,
 }: {
@@ -273,6 +302,7 @@ export function buildDispatcherAttentionItems({
   data: DispatcherCockpitData;
   loadReadinessItems: OperationalReadiness<LoadReadinessStatus>[];
   matchingIsReady: boolean;
+  matchingFreshnessState: FreshnessState;
   reservationSuggestions: SuggestionVisibilityItem[];
   vehicleReadinessItems: OperationalReadiness<VehicleReadinessStatus>[];
 }) {
@@ -289,11 +319,11 @@ export function buildDispatcherAttentionItems({
     });
   }
 
-  for (const suggestion of reservationSuggestions.filter((item) => item.isStale).slice(0, 4)) {
+  for (const suggestion of reservationSuggestions.filter(suggestionNeedsReview).slice(0, 4)) {
     items.push({
       id: `suggestion:${suggestion.suggestionId}`,
       tone: "gray",
-      label: "Stale matching",
+      label: suggestion.isStale ? "Stale matching" : "Review suggestion",
       title: suggestion.label,
       detail: suggestion.scoreLabel || "Review suggested match",
       reason: suggestion.staleReason ?? "Suggestion is unavailable for reservation.",
@@ -311,7 +341,7 @@ export function buildDispatcherAttentionItems({
       tone: readiness.status === "stale" ? "amber" : "gray",
       label:
         readiness.status === "stale"
-          ? "Stale matching"
+          ? matchingContextLabel(matchingFreshnessState)
           : "Unavailable for reservation",
       title: load.referenceNumber ?? load.externalId ?? load.id,
       detail: load.status,
@@ -330,7 +360,7 @@ export function buildDispatcherAttentionItems({
       tone: readiness.status === "stale_matching_context" ? "amber" : "blue",
       label:
         readiness.status === "stale_matching_context"
-          ? "Stale matching"
+          ? matchingContextLabel(matchingFreshnessState)
           : "Needs review",
       title: vehicle.unitNumber,
       detail: vehicle.status,
@@ -345,7 +375,7 @@ export function buildDispatcherAttentionItems({
       label: "Needs review",
       title: "Matching context",
       detail: "No fresh suggestions",
-      reason: "Fresh matching context is required before reservation selection.",
+      reason: matchingContextReason(matchingFreshnessState),
     });
   }
 
@@ -357,6 +387,7 @@ export function buildMatchingExplanationItems({
   data,
   loadReadinessItems,
   matchingIsReady,
+  matchingFreshnessState,
   reservationSuggestions,
   vehicleReadinessItems,
 }: {
@@ -364,6 +395,7 @@ export function buildMatchingExplanationItems({
   data: DispatcherCockpitData;
   loadReadinessItems: OperationalReadiness<LoadReadinessStatus>[];
   matchingIsReady: boolean;
+  matchingFreshnessState: FreshnessState;
   reservationSuggestions: SuggestionVisibilityItem[];
   vehicleReadinessItems: OperationalReadiness<VehicleReadinessStatus>[];
 }) {
@@ -374,14 +406,18 @@ export function buildMatchingExplanationItems({
       id: "matching-context",
       tone: "amber",
       subject: "Matching context",
-      label: "Stale context",
-      message:
-        "Operational matching context is stale or unavailable, so reservation readiness requires review.",
+      label:
+        matchingFreshnessState === "stale"
+          ? "Stale context"
+          : "Matching review pending",
+      message: `${matchingContextReason(
+        matchingFreshnessState,
+      )} Reservation readiness requires review.`,
       source: "latest matching run freshness",
     });
   }
 
-  for (const suggestion of reservationSuggestions.filter((item) => item.isStale)) {
+  for (const suggestion of reservationSuggestions.filter(suggestionNeedsReview)) {
     items.push({
       id: `suggestion:${suggestion.suggestionId}`,
       tone: "gray",

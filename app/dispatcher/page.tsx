@@ -28,6 +28,7 @@ import {
   type AttentionTone,
   type DispatcherAttentionItem,
   type ExplanationTone,
+  type FreshnessState,
   type FreshnessTone,
   type MatchingExplanationItem,
   type MatchingFreshnessSnapshot,
@@ -422,11 +423,13 @@ function ReservationState({
 function LoadTable({
   loads,
   now,
+  matchingFreshnessState,
   matchingIsReady,
   reservableLoadIds,
 }: {
   loads: DispatcherLoadView[];
   now: Date;
+  matchingFreshnessState: FreshnessState;
   matchingIsReady: boolean;
   reservableLoadIds: Set<string>;
 }) {
@@ -451,6 +454,7 @@ function LoadTable({
           {loads.map((load) => {
             const readiness = loadReadiness({
               load,
+              matchingFreshnessState,
               matchingIsReady,
               hasReservableSuggestion: reservableLoadIds.has(load.id),
             });
@@ -729,7 +733,11 @@ export default async function DispatcherCockpitPage() {
   );
   const reservationSuggestions: ReservationActionSuggestion[] = data.suggestions.map(
     (suggestion) => {
-      const staleReason = staleReasonForSuggestion({ suggestion, matchingIsReady });
+      const staleReason = staleReasonForSuggestion({
+        suggestion,
+        matchingFreshnessState: matchingFreshnessSnapshotValue.state,
+        matchingIsReady,
+      });
 
       return {
         suggestionId: suggestion.row.id,
@@ -745,7 +753,7 @@ export default async function DispatcherCockpitPage() {
         status: suggestion.row.status,
         loadStatus: suggestion.load?.status ?? "unknown",
         isReservable: staleReason === null,
-        isStale: staleReason !== null,
+        isStale: staleReason !== null && matchingFreshnessSnapshotValue.state === "stale",
         staleReason: staleReason ?? undefined,
       };
     },
@@ -762,6 +770,7 @@ export default async function DispatcherCockpitPage() {
   const loadReadinessItems = data.loads.map((load) =>
     loadReadiness({
       load,
+      matchingFreshnessState: matchingFreshnessSnapshotValue.state,
       matchingIsReady,
       hasReservableSuggestion: reservableLoadIds.has(load.id),
     }),
@@ -770,6 +779,7 @@ export default async function DispatcherCockpitPage() {
     vehicleReadiness({
       vehicle,
       hasActiveReservation: activeReservationByVehicleId.has(vehicle.id),
+      matchingFreshnessState: matchingFreshnessSnapshotValue.state,
       matchingIsReady,
     }),
   );
@@ -844,6 +854,7 @@ export default async function DispatcherCockpitPage() {
     data,
     loadReadinessItems,
     matchingIsReady,
+    matchingFreshnessState: matchingFreshnessSnapshotValue.state,
     reservationSuggestions,
     vehicleReadinessItems,
   });
@@ -852,6 +863,7 @@ export default async function DispatcherCockpitPage() {
     data,
     loadReadinessItems,
     matchingIsReady,
+    matchingFreshnessState: matchingFreshnessSnapshotValue.state,
     reservationSuggestions,
     vehicleReadinessItems,
   });
@@ -1021,15 +1033,11 @@ export default async function DispatcherCockpitPage() {
             />
             {data.vehicles.length > 0 ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {data.vehicles.map((vehicle) => (
+                {data.vehicles.map((vehicle, index) => (
                   <VehicleCard
                     key={vehicle.id}
                     vehicle={vehicle}
-                    readiness={vehicleReadiness({
-                      vehicle,
-                      hasActiveReservation: activeReservationByVehicleId.has(vehicle.id),
-                      matchingIsReady,
-                    })}
+                    readiness={vehicleReadinessItems[index]}
                   />
                 ))}
               </div>
@@ -1046,6 +1054,7 @@ export default async function DispatcherCockpitPage() {
             <LoadTable
               loads={data.loads}
               now={now}
+              matchingFreshnessState={matchingFreshnessSnapshotValue.state}
               matchingIsReady={matchingIsReady}
               reservableLoadIds={reservableLoadIds}
             />
