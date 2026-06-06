@@ -79,6 +79,21 @@ export type OperationalReviewPriorityGroup = {
   rationale: string;
   items: DecisionSupportSignal[];
 };
+export type OperationalFocusCategory =
+  | "reservation risk"
+  | "stale operational context"
+  | "matching confidence review"
+  | "planning availability review"
+  | "current planning context";
+export type OperationalFocusQueueItem = {
+  id: string;
+  rank: number;
+  category: OperationalFocusCategory;
+  title: string;
+  reason: string;
+  source: string;
+  tone: AttentionTone;
+};
 
 type ReservationVisibilityItem = {
   reservationId: string;
@@ -226,6 +241,19 @@ function decisionSignalRank(signal: DecisionSupportSignal) {
   if (signal.id === "load-review") return 3;
   if (signal.id === "vehicle-review") return 4;
   return 5;
+}
+
+function focusCategoryForSignal(
+  signal: DecisionSupportSignal,
+): OperationalFocusCategory {
+  if (signal.id === "hold-review") return "reservation risk";
+  if (signal.id === "matching-confidence") return "matching confidence review";
+  if (signal.id === "suggestion-review") return "stale operational context";
+  if (signal.id === "load-review" || signal.id === "vehicle-review") {
+    return "planning availability review";
+  }
+
+  return "current planning context";
 }
 
 export function loadReadiness({
@@ -737,4 +765,25 @@ export function buildOperationalReviewPriorityGroups(
       items: signals.filter((signal) => signal.priority === group.id),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+export function buildOperationalFocusQueue(
+  signals: DecisionSupportSignal[],
+) {
+  return [...signals]
+    .sort(
+      (left, right) =>
+        priorityRank(left.priority) - priorityRank(right.priority) ||
+        decisionSignalRank(left) - decisionSignalRank(right),
+    )
+    .slice(0, 4)
+    .map((signal, index): OperationalFocusQueueItem => ({
+      id: signal.id,
+      rank: index + 1,
+      category: focusCategoryForSignal(signal),
+      title: signal.title,
+      reason: signal.reason,
+      source: signal.summary,
+      tone: signal.tone,
+    }));
 }

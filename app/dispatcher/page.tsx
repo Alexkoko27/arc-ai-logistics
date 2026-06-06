@@ -18,9 +18,10 @@ import {
 } from "@/lib/dispatch/cockpitQueries";
 import {
   MATCHING_STALE_AFTER_MINUTES,
-  buildDispatcherDecisionSupportSignals,
   buildDispatcherAttentionItems,
+  buildDispatcherDecisionSupportSignals,
   buildMatchingExplanationItems,
+  buildOperationalFocusQueue,
   buildOperationalFreshnessItems,
   buildOperationalReviewPriorityGroups,
   loadReadiness,
@@ -34,6 +35,7 @@ import {
   type FreshnessTone,
   type MatchingExplanationItem,
   type MatchingFreshnessSnapshot,
+  type OperationalFocusQueueItem,
   type OperationalFreshnessItem,
   type OperationalReadiness,
   type OperationalReviewPriorityGroup,
@@ -349,6 +351,47 @@ function DecisionSupportSection({
               ))}
             </div>
           </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function OperationalFocusSection({
+  items,
+}: {
+  items: OperationalFocusQueueItem[];
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader
+        title="Operational Focus"
+        description="Derived attention ordering for dispatcher review. This is not an execution queue."
+      />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {items.map((item) => (
+          <article
+            key={item.id}
+            className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Focus {item.rank} · {item.category}
+                </p>
+                <h3 className="mt-1 font-bold text-gray-950">{item.title}</h3>
+                <p className="mt-1 text-sm text-gray-600">{item.source}</p>
+              </div>
+              <span
+                className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${attentionToneClass(
+                  item.tone,
+                )}`}
+              >
+                review
+              </span>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-gray-500">{item.reason}</p>
+          </article>
         ))}
       </div>
     </section>
@@ -957,6 +1000,7 @@ export default async function DispatcherCockpitPage() {
   const decisionSupportGroups = buildOperationalReviewPriorityGroups(
     decisionSupportSignals,
   );
+  const operationalFocusQueue = buildOperationalFocusQueue(decisionSupportSignals);
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -1103,6 +1147,8 @@ export default async function DispatcherCockpitPage() {
               description="Unavailable due to readiness, hold, status, or matching context."
             />
           </section>
+
+          <OperationalFocusSection items={operationalFocusQueue} />
 
           <DecisionSupportSection groups={decisionSupportGroups} />
 
