@@ -189,7 +189,7 @@ function assertEffectiveLoadTiming(
   if (pickupEndsAt && deliveryStartsAt && pickupEndsAt > deliveryStartsAt) {
     throw new DispatcherLoadDomainError(
       "LOAD_INVALID_TIMING",
-      "Delivery must start after pickup is complete.",
+      "Delivery start must be after pickup end.",
     );
   }
 }

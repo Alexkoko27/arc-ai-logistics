@@ -106,7 +106,7 @@ function validateLoadTiming(
     ctx.addIssue({
       code: "custom",
       path: ["deliveryStartsAt"],
-      message: "Delivery must start after pickup is complete.",
+      message: "Delivery start must be after pickup end.",
     });
   }
 }
