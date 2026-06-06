@@ -76,6 +76,7 @@ export type OperationalReviewPriorityGroup = {
   id: DecisionSupportSignal["priority"];
   title: string;
   description: string;
+  rationale: string;
   items: DecisionSupportSignal[];
 };
 
@@ -709,18 +710,24 @@ export function buildOperationalReviewPriorityGroups(
       title: "Review First",
       description:
         "Highest planning attention based on freshness confidence, temporary holds, or unavailable suggestions.",
+      rationale:
+        "Shown first when a planning signal can change reservation readiness soon or reduce confidence in current suggestions.",
     },
     {
       id: "high attention",
       title: "High Attention",
       description:
         "Planning review signals visible before lower-confidence matching context is treated as current.",
+      rationale:
+        "Shown next when current planning context is usable but still needs dispatcher review before acting on readiness.",
     },
     {
       id: "monitor",
       title: "Monitor",
       description:
         "Lower-pressure planning signals that remain useful for operational awareness.",
+      rationale:
+        "Shown last when the signal is informative but does not currently block planning visibility.",
     },
   ];
 

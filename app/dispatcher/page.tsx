@@ -319,6 +319,9 @@ function DecisionSupportSection({
               <p className="mt-1 text-sm leading-6 text-gray-600">
                 {group.description}
               </p>
+              <p className="mt-2 text-xs leading-5 text-gray-500">
+                {group.rationale}
+              </p>
             </div>
             <div className="mt-4 space-y-3">
               {group.items.map((item) => (
