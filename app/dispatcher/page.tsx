@@ -241,6 +241,9 @@ function OperationalFreshnessSection({
             <p className="mt-3 text-xs font-semibold text-gray-500">
               {item.confidence}
             </p>
+            <p className="mt-2 text-xs leading-5 text-gray-500">
+              {item.limitation}
+            </p>
           </article>
         ))}
       </div>

@@ -63,6 +63,7 @@ export type OperationalFreshnessItem = {
   label: string;
   detail: string;
   confidence: string;
+  limitation: string;
 };
 export type DecisionSupportSignal = {
   id: string;
@@ -226,6 +227,28 @@ function confidencePriority(
   if (matchingFreshness.state === "aging") return "monitor";
 
   return "high attention";
+}
+
+function matchingReasoningLimitation(
+  matchingFreshness: MatchingFreshnessSnapshot,
+) {
+  if (matchingFreshness.state === "fresh") {
+    return "Context appears current for planning review.";
+  }
+
+  if (matchingFreshness.state === "aging") {
+    return "Reasoning confidence is limited by aging matching context.";
+  }
+
+  if (matchingFreshness.state === "stale") {
+    return "Reasoning confidence is limited by stale matching context.";
+  }
+
+  if (matchingFreshness.state === "pending") {
+    return "Reasoning confidence is limited until matching review is ready.";
+  }
+
+  return "Reasoning confidence is limited because matching context is unavailable.";
 }
 
 function priorityRank(priority: DecisionSupportSignal["priority"]) {
@@ -591,6 +614,7 @@ export function buildOperationalFreshnessItems({
         .filter(Boolean)
         .join(" "),
       confidence: matchingFreshness.confidenceLabel,
+      limitation: matchingReasoningLimitation(matchingFreshness),
     },
     {
       id: "suggestion-readiness",
@@ -605,6 +629,10 @@ export function buildOperationalFreshnessItems({
         suggestionReviewCount > 0
           ? "Derived from reservability checks, not matching age alone."
           : "Current suggestions pass reservation readiness checks.",
+      limitation:
+        suggestionReviewCount > 0
+          ? "Visibility reduced until unavailable suggestions are reviewed."
+          : "No suggestion-level reasoning limitation is currently visible.",
     },
     {
       id: "hold-availability",
@@ -619,6 +647,10 @@ export function buildOperationalFreshnessItems({
         expiringHoldCount > 0
           ? "Review hold availability before expiration changes reservability."
           : "No active hold availability pressure.",
+      limitation:
+        expiringHoldCount > 0
+          ? "Reservation timing reduces planning certainty for affected loads."
+          : "No reservation timing limitation is currently visible.",
     },
   ] satisfies OperationalFreshnessItem[];
 }
