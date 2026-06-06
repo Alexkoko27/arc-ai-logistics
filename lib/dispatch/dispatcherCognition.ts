@@ -34,10 +34,20 @@ export type OperationalFreshnessItem = {
   limitation: string;
 };
 
+type DecisionSignalId =
+  | "hold-review"
+  | "matching-confidence"
+  | "suggestion-review"
+  | "load-review"
+  | "vehicle-review"
+  | "current-planning-context";
+
+type DecisionSignalPriority = "review first" | "high attention" | "monitor";
+
 export type DecisionSupportSignal = {
-  id: string;
+  id: DecisionSignalId;
   tone: AttentionTone;
-  priority: "review first" | "high attention" | "monitor";
+  priority: DecisionSignalPriority;
   title: string;
   summary: string;
   reason: string;
@@ -93,6 +103,62 @@ const operationalReasoningText = {
     "Planning visibility is reduced until unavailable suggestions are reviewed.",
 } as const;
 
+const priorityRankBySignalPriority: Record<DecisionSignalPriority, number> = {
+  "review first": 0,
+  "high attention": 1,
+  monitor: 2,
+};
+
+const signalRankById: Record<DecisionSignalId, number> = {
+  "hold-review": 0,
+  "matching-confidence": 1,
+  "suggestion-review": 2,
+  "load-review": 3,
+  "vehicle-review": 4,
+  "current-planning-context": 5,
+};
+
+const focusCategoryBySignalId: Record<
+  DecisionSignalId,
+  OperationalFocusCategory
+> = {
+  "hold-review": operationalReasoningText.reservationRisk,
+  "matching-confidence": operationalReasoningText.matchingConfidenceReview,
+  "suggestion-review": operationalReasoningText.staleOperationalContext,
+  "load-review": operationalReasoningText.planningAvailabilityReview,
+  "vehicle-review": operationalReasoningText.planningAvailabilityReview,
+  "current-planning-context": operationalReasoningText.currentPlanningContextCategory,
+};
+
+const reviewPriorityGroupDefinitions: Array<
+  Omit<OperationalReviewPriorityGroup, "items">
+> = [
+  {
+    id: "review first",
+    title: "Review First",
+    description:
+      "Highest planning attention based on freshness confidence, temporary holds, or unavailable suggestions.",
+    rationale:
+      "Shown first when a planning signal can change reservation readiness soon or reduce confidence in current suggestions.",
+  },
+  {
+    id: "high attention",
+    title: "High Attention",
+    description:
+      "Planning review signals visible before lower-confidence matching context is treated as current.",
+    rationale:
+      "Shown next when current planning context is usable but still needs dispatcher review before relying on readiness.",
+  },
+  {
+    id: "monitor",
+    title: "Monitor",
+    description:
+      "Lower-pressure planning signals that remain useful for operational awareness.",
+    rationale:
+      "Shown last when the signal is informative but does not currently block planning visibility.",
+  },
+];
+
 function suggestionNeedsReview(suggestion: SuggestionVisibilityItem) {
   return Boolean(suggestion.staleReason);
 }
@@ -110,7 +176,7 @@ function matchingContextLabel(matchingFreshnessState: MatchingFreshnessSnapshot[
 
 function confidencePriority(
   matchingFreshness: MatchingFreshnessSnapshot,
-): DecisionSupportSignal["priority"] {
+): DecisionSignalPriority {
   if (["stale", "pending", "unavailable"].includes(matchingFreshness.state)) {
     return "review first";
   }
@@ -118,6 +184,28 @@ function confidencePriority(
   if (matchingFreshness.state === "aging") return "monitor";
 
   return "high attention";
+}
+
+function suggestionReviewPriority(
+  matchingFreshness: MatchingFreshnessSnapshot,
+): DecisionSignalPriority {
+  return matchingFreshness.state === "stale" ? "review first" : "high attention";
+}
+
+function reviewAvailabilityPriority(
+  matchingReviewCount: number,
+): DecisionSignalPriority {
+  return matchingReviewCount > 0 ? "high attention" : "monitor";
+}
+
+function matchingConfidenceTone(
+  matchingFreshness: MatchingFreshnessSnapshot,
+): AttentionTone {
+  return matchingFreshness.tone === "amber" ? "amber" : "gray";
+}
+
+function suggestionReviewTone(matchingFreshness: MatchingFreshnessSnapshot) {
+  return matchingFreshness.state === "stale" ? "amber" : "gray";
 }
 
 function matchingReasoningLimitation(
@@ -142,36 +230,21 @@ function matchingReasoningLimitation(
   return `${operationalReasoningText.planningConfidenceLimited} because matching context is unavailable.`;
 }
 
-function priorityRank(priority: DecisionSupportSignal["priority"]) {
-  if (priority === "review first") return 0;
-  if (priority === "high attention") return 1;
-  return 2;
-}
-
 function decisionSignalRank(signal: DecisionSupportSignal) {
-  if (signal.id === "hold-review") return 0;
-  if (signal.id === "matching-confidence") return 1;
-  if (signal.id === "suggestion-review") return 2;
-  if (signal.id === "load-review") return 3;
-  if (signal.id === "vehicle-review") return 4;
-  return 5;
+  return signalRankById[signal.id];
 }
 
-function focusCategoryForSignal(
-  signal: DecisionSupportSignal,
-): OperationalFocusCategory {
-  if (signal.id === "hold-review") return operationalReasoningText.reservationRisk;
-  if (signal.id === "matching-confidence") {
-    return operationalReasoningText.matchingConfidenceReview;
-  }
-  if (signal.id === "suggestion-review") {
-    return operationalReasoningText.staleOperationalContext;
-  }
-  if (signal.id === "load-review" || signal.id === "vehicle-review") {
-    return operationalReasoningText.planningAvailabilityReview;
-  }
+function focusCategoryForSignal(signal: DecisionSupportSignal) {
+  return focusCategoryBySignalId[signal.id];
+}
 
-  return operationalReasoningText.currentPlanningContextCategory;
+function sortDecisionSignals(signals: DecisionSupportSignal[]) {
+  return [...signals].sort(
+    (left, right) =>
+      priorityRankBySignalPriority[left.priority] -
+        priorityRankBySignalPriority[right.priority] ||
+      decisionSignalRank(left) - decisionSignalRank(right),
+  );
 }
 
 export function buildOperationalFreshnessItems({
@@ -281,7 +354,7 @@ export function buildDispatcherDecisionSupportSignals({
   if (["stale", "pending", "unavailable", "aging"].includes(matchingFreshness.state)) {
     signals.push({
       id: "matching-confidence",
-      tone: matchingFreshness.tone === "amber" ? "amber" : "gray",
+      tone: matchingConfidenceTone(matchingFreshness),
       priority: confidencePriority(matchingFreshness),
       title: operationalReasoningText.matchingConfidence,
       summary: matchingContextLabel(matchingFreshness.state),
@@ -304,8 +377,8 @@ export function buildDispatcherDecisionSupportSignals({
   if (suggestionReviewCount > 0) {
     signals.push({
       id: "suggestion-review",
-      tone: matchingFreshness.state === "stale" ? "amber" : "gray",
-      priority: matchingFreshness.state === "stale" ? "review first" : "high attention",
+      tone: suggestionReviewTone(matchingFreshness),
+      priority: suggestionReviewPriority(matchingFreshness),
       title: "Suggestion review",
       summary: `${suggestionReviewCount} suggestions unavailable for reservation review`,
       reason:
@@ -317,7 +390,7 @@ export function buildDispatcherDecisionSupportSignals({
     signals.push({
       id: "load-review",
       tone: matchingReviewLoadCount > 0 ? "amber" : "gray",
-      priority: matchingReviewLoadCount > 0 ? "high attention" : "monitor",
+      priority: reviewAvailabilityPriority(matchingReviewLoadCount),
       title: "Load planning status",
       summary: `${matchingReviewLoadCount} matching review, ${unavailableLoadCount} unavailable`,
       reason:
@@ -329,7 +402,7 @@ export function buildDispatcherDecisionSupportSignals({
     signals.push({
       id: "vehicle-review",
       tone: matchingReviewVehicleCount > 0 ? "amber" : "blue",
-      priority: matchingReviewVehicleCount > 0 ? "high attention" : "monitor",
+      priority: reviewAvailabilityPriority(matchingReviewVehicleCount),
       title: "Vehicle planning status",
       summary: `${matchingReviewVehicleCount} matching review, ${unavailableVehicleCount} unavailable`,
       reason:
@@ -348,48 +421,13 @@ export function buildDispatcherDecisionSupportSignals({
     });
   }
 
-  return [...signals]
-    .sort(
-      (left, right) =>
-        priorityRank(left.priority) - priorityRank(right.priority) ||
-        decisionSignalRank(left) - decisionSignalRank(right),
-    )
-    .slice(0, 5);
+  return sortDecisionSignals(signals).slice(0, 5);
 }
 
 export function buildOperationalReviewPriorityGroups(
   signals: DecisionSupportSignal[],
 ) {
-  const groupDefinitions: Array<
-    Omit<OperationalReviewPriorityGroup, "items">
-  > = [
-    {
-      id: "review first",
-      title: "Review First",
-      description:
-        "Highest planning attention based on freshness confidence, temporary holds, or unavailable suggestions.",
-      rationale:
-        "Shown first when a planning signal can change reservation readiness soon or reduce confidence in current suggestions.",
-    },
-    {
-      id: "high attention",
-      title: "High Attention",
-      description:
-        "Planning review signals visible before lower-confidence matching context is treated as current.",
-      rationale:
-        "Shown next when current planning context is usable but still needs dispatcher review before relying on readiness.",
-    },
-    {
-      id: "monitor",
-      title: "Monitor",
-      description:
-        "Lower-pressure planning signals that remain useful for operational awareness.",
-      rationale:
-        "Shown last when the signal is informative but does not currently block planning visibility.",
-    },
-  ];
-
-  return groupDefinitions
+  return reviewPriorityGroupDefinitions
     .map((group) => ({
       ...group,
       items: signals.filter((signal) => signal.priority === group.id),
@@ -400,12 +438,7 @@ export function buildOperationalReviewPriorityGroups(
 export function buildOperationalFocusQueue(
   signals: DecisionSupportSignal[],
 ) {
-  return [...signals]
-    .sort(
-      (left, right) =>
-        priorityRank(left.priority) - priorityRank(right.priority) ||
-        decisionSignalRank(left) - decisionSignalRank(right),
-    )
+  return sortDecisionSignals(signals)
     .slice(0, 4)
     .map((signal, index): OperationalFocusQueueItem => ({
       id: signal.id,
