@@ -371,7 +371,7 @@ function OperationalFocusSection({
     <section className="space-y-3">
       <SectionHeader
         title="Operational Focus"
-        description="Derived attention ordering for dispatcher review. This is not an execution queue."
+        description="Derived attention ordering for dispatcher review. It remains read-only planning visibility."
       />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {items.map((item) => (

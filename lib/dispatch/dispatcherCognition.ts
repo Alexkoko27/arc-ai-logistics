@@ -68,15 +68,44 @@ export type OperationalFocusQueueItem = {
   tone: AttentionTone;
 };
 
+const operationalReasoningText = {
+  currentPlanningContext: "Current planning context",
+  currentPlanningContextCategory: "current planning context",
+  elevatedDecisionSupportSignals: "No elevated decision-support signals",
+  matchingConfidence: "Matching confidence",
+  matchingContextUnavailable: "Matching context unavailable",
+  matchingConfidenceReview: "matching confidence review",
+  matchingReview: "Matching review",
+  matchingReviewPending: "Matching review pending",
+  noVisibleReservationTimingLimitation:
+    "No reservation timing limitation is currently visible.",
+  noVisibleSuggestionLimitation:
+    "No suggestion-level reasoning limitation is currently visible.",
+  planningAvailabilityReview: "planning availability review",
+  planningConfidenceLimited: "Planning confidence is limited",
+  reservationRisk: "reservation risk",
+  reservationTimingUncertainty:
+    "Reservation timing uncertainty reduces planning confidence for affected loads.",
+  staleMatching: "Stale matching",
+  staleOperationalContext: "stale operational context",
+  temporaryHoldReview: "Temporary hold review",
+  visibilityReduced:
+    "Planning visibility is reduced until unavailable suggestions are reviewed.",
+} as const;
+
 function suggestionNeedsReview(suggestion: SuggestionVisibilityItem) {
   return Boolean(suggestion.staleReason);
 }
 
 function matchingContextLabel(matchingFreshnessState: MatchingFreshnessSnapshot["state"]) {
-  if (matchingFreshnessState === "stale") return "Stale matching";
-  if (matchingFreshnessState === "pending") return "Matching review pending";
-  if (matchingFreshnessState === "unavailable") return "Matching context unavailable";
-  return "Matching review";
+  if (matchingFreshnessState === "stale") return operationalReasoningText.staleMatching;
+  if (matchingFreshnessState === "pending") {
+    return operationalReasoningText.matchingReviewPending;
+  }
+  if (matchingFreshnessState === "unavailable") {
+    return operationalReasoningText.matchingContextUnavailable;
+  }
+  return operationalReasoningText.matchingReview;
 }
 
 function confidencePriority(
@@ -99,18 +128,18 @@ function matchingReasoningLimitation(
   }
 
   if (matchingFreshness.state === "aging") {
-    return "Reasoning confidence is limited by aging matching context.";
+    return `${operationalReasoningText.planningConfidenceLimited} by aging matching context.`;
   }
 
   if (matchingFreshness.state === "stale") {
-    return "Reasoning confidence is limited by stale matching context.";
+    return `${operationalReasoningText.planningConfidenceLimited} by stale operational context.`;
   }
 
   if (matchingFreshness.state === "pending") {
-    return "Reasoning confidence is limited until matching review is ready.";
+    return `${operationalReasoningText.planningConfidenceLimited} until matching review is ready.`;
   }
 
-  return "Reasoning confidence is limited because matching context is unavailable.";
+  return `${operationalReasoningText.planningConfidenceLimited} because matching context is unavailable.`;
 }
 
 function priorityRank(priority: DecisionSupportSignal["priority"]) {
@@ -131,14 +160,18 @@ function decisionSignalRank(signal: DecisionSupportSignal) {
 function focusCategoryForSignal(
   signal: DecisionSupportSignal,
 ): OperationalFocusCategory {
-  if (signal.id === "hold-review") return "reservation risk";
-  if (signal.id === "matching-confidence") return "matching confidence review";
-  if (signal.id === "suggestion-review") return "stale operational context";
+  if (signal.id === "hold-review") return operationalReasoningText.reservationRisk;
+  if (signal.id === "matching-confidence") {
+    return operationalReasoningText.matchingConfidenceReview;
+  }
+  if (signal.id === "suggestion-review") {
+    return operationalReasoningText.staleOperationalContext;
+  }
   if (signal.id === "load-review" || signal.id === "vehicle-review") {
-    return "planning availability review";
+    return operationalReasoningText.planningAvailabilityReview;
   }
 
-  return "current planning context";
+  return operationalReasoningText.currentPlanningContextCategory;
 }
 
 export function buildOperationalFreshnessItems({
@@ -192,8 +225,8 @@ export function buildOperationalFreshnessItems({
           : "Current suggestions pass reservation readiness checks.",
       limitation:
         suggestionReviewCount > 0
-          ? "Visibility reduced until unavailable suggestions are reviewed."
-          : "No suggestion-level reasoning limitation is currently visible.",
+          ? operationalReasoningText.visibilityReduced
+          : operationalReasoningText.noVisibleSuggestionLimitation,
     },
     {
       id: "hold-availability",
@@ -210,8 +243,8 @@ export function buildOperationalFreshnessItems({
           : "No active hold availability pressure.",
       limitation:
         expiringHoldCount > 0
-          ? "Reservation timing reduces planning certainty for affected loads."
-          : "No reservation timing limitation is currently visible.",
+          ? operationalReasoningText.reservationTimingUncertainty
+          : operationalReasoningText.noVisibleReservationTimingLimitation,
     },
   ] satisfies OperationalFreshnessItem[];
 }
@@ -250,7 +283,7 @@ export function buildDispatcherDecisionSupportSignals({
       id: "matching-confidence",
       tone: matchingFreshness.tone === "amber" ? "amber" : "gray",
       priority: confidencePriority(matchingFreshness),
-      title: "Matching confidence",
+      title: operationalReasoningText.matchingConfidence,
       summary: matchingContextLabel(matchingFreshness.state),
       reason: `${matchingFreshness.detail} ${matchingFreshness.confidenceLabel}.`,
     });
@@ -261,9 +294,10 @@ export function buildDispatcherDecisionSupportSignals({
       id: "hold-review",
       tone: "amber",
       priority: "review first",
-      title: "Temporary hold review",
+      title: operationalReasoningText.temporaryHoldReview,
       summary: `${expiringHoldCount} active holds near expiration`,
-      reason: "Review hold availability first because expiring holds can change reservability soon.",
+      reason:
+        "Operational review should consider temporary hold availability before reservation timing changes reservability.",
     });
   }
 
@@ -274,7 +308,8 @@ export function buildDispatcherDecisionSupportSignals({
       priority: matchingFreshness.state === "stale" ? "review first" : "high attention",
       title: "Suggestion review",
       summary: `${suggestionReviewCount} suggestions unavailable for reservation review`,
-      reason: "Review suggested matches with readiness, hold, status, or matching-context issues.",
+      reason:
+        "Operational review should consider suggested matches with readiness, hold, status, or matching-context limitations.",
     });
   }
 
@@ -285,7 +320,8 @@ export function buildDispatcherDecisionSupportSignals({
       priority: matchingReviewLoadCount > 0 ? "high attention" : "monitor",
       title: "Load planning status",
       summary: `${matchingReviewLoadCount} matching review, ${unavailableLoadCount} unavailable`,
-      reason: "Review loads blocked by matching context separately from loads unavailable by current load state.",
+      reason:
+        "Operational review should separate loads limited by matching context from loads unavailable by current load state.",
     });
   }
 
@@ -296,7 +332,8 @@ export function buildDispatcherDecisionSupportSignals({
       priority: matchingReviewVehicleCount > 0 ? "high attention" : "monitor",
       title: "Vehicle planning status",
       summary: `${matchingReviewVehicleCount} matching review, ${unavailableVehicleCount} unavailable`,
-      reason: "Review vehicles with matching-context issues separately from vehicles unavailable by current vehicle state.",
+      reason:
+        "Operational review should separate vehicles limited by matching context from vehicles unavailable by current vehicle state.",
     });
   }
 
@@ -305,8 +342,8 @@ export function buildDispatcherDecisionSupportSignals({
       id: "current-planning-context",
       tone: "blue",
       priority: "monitor",
-      title: "Current planning context",
-      summary: "No elevated decision-support signals",
+      title: operationalReasoningText.currentPlanningContext,
+      summary: operationalReasoningText.elevatedDecisionSupportSignals,
       reason: "Current freshness, readiness, suggestions, and temporary holds do not require elevated review.",
     });
   }
@@ -340,7 +377,7 @@ export function buildOperationalReviewPriorityGroups(
       description:
         "Planning review signals visible before lower-confidence matching context is treated as current.",
       rationale:
-        "Shown next when current planning context is usable but still needs dispatcher review before acting on readiness.",
+        "Shown next when current planning context is usable but still needs dispatcher review before relying on readiness.",
     },
     {
       id: "monitor",
