@@ -455,6 +455,9 @@ export const loadReservations = pgTable(
     )
       .on(table.loadSuggestionId)
       .where(sql`${table.status} = 'active'`),
+    activeExpirationIdx: index("load_reservations_active_expiration_idx")
+      .on(table.organizationId, table.expiresAt)
+      .where(sql`${table.status} = 'active'`),
     loadIdx: index("load_reservations_load_id_idx").on(table.loadId),
     organizationIdx: index("load_reservations_organization_id_idx").on(
       table.organizationId,

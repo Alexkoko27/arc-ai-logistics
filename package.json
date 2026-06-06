@@ -13,7 +13,8 @@
     "db:seed": "tsx scripts/seed-default-agents.ts",
     "db:seed:dispatcher": "tsx scripts/seed-dispatcher-mock-data.ts",
     "dispatch:match": "tsx scripts/run-matching.ts",
-    "dispatch:verify-reservation-lock": "tsx scripts/verify-reservation-lock.ts"
+    "dispatch:verify-reservation-lock": "tsx scripts/verify-reservation-lock.ts",
+    "dispatch:verify-stale-active-reservations": "tsx scripts/verify-stale-active-reservations.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
