@@ -1,5 +1,6 @@
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -81,6 +82,10 @@ export const vehicles = pgTable(
   },
   (table) => ({
     organizationIdx: index("vehicles_organization_id_idx").on(
+      table.organizationId,
+    ),
+    idOrganizationIdx: uniqueIndex("vehicles_id_organization_id_idx").on(
+      table.id,
       table.organizationId,
     ),
     organizationUnitIdx: uniqueIndex("vehicles_org_unit_number_idx").on(
@@ -264,6 +269,10 @@ export const loads = pgTable(
       table.organizationId,
       table.status,
     ),
+    idOrganizationIdx: uniqueIndex("loads_id_organization_id_idx").on(
+      table.id,
+      table.organizationId,
+    ),
     externalIdx: index("loads_external_idx").on(table.sourceId, table.externalId),
   }),
 );
@@ -357,10 +366,26 @@ export const loadSuggestions = pgTable(
     matchingRunIdx: index("load_suggestions_matching_run_id_idx").on(
       table.matchingRunId,
     ),
+    idOrganizationIdx: uniqueIndex(
+      "load_suggestions_id_organization_id_idx",
+    ).on(table.id, table.organizationId),
+    idLoadOrganizationIdx: uniqueIndex(
+      "load_suggestions_id_load_org_idx",
+    ).on(table.id, table.loadId, table.organizationId),
     vehicleRankIdx: index("load_suggestions_vehicle_rank_idx").on(
       table.vehicleId,
       table.rank,
     ),
+    loadOrganizationFk: foreignKey({
+      columns: [table.loadId, table.organizationId],
+      foreignColumns: [loads.id, loads.organizationId],
+      name: "load_suggestions_load_org_fk",
+    }),
+    vehicleOrganizationFk: foreignKey({
+      columns: [table.vehicleId, table.organizationId],
+      foreignColumns: [vehicles.id, vehicles.organizationId],
+      name: "load_suggestions_vehicle_org_fk",
+    }),
   }),
 );
 
@@ -402,6 +427,25 @@ export const loadReservations = pgTable(
     organizationIdx: index("load_reservations_organization_id_idx").on(
       table.organizationId,
     ),
+    loadOrganizationFk: foreignKey({
+      columns: [table.loadId, table.organizationId],
+      foreignColumns: [loads.id, loads.organizationId],
+      name: "load_reservations_load_org_fk",
+    }),
+    vehicleOrganizationFk: foreignKey({
+      columns: [table.vehicleId, table.organizationId],
+      foreignColumns: [vehicles.id, vehicles.organizationId],
+      name: "load_reservations_vehicle_org_fk",
+    }),
+    suggestionLoadOrganizationFk: foreignKey({
+      columns: [table.loadSuggestionId, table.loadId, table.organizationId],
+      foreignColumns: [
+        loadSuggestions.id,
+        loadSuggestions.loadId,
+        loadSuggestions.organizationId,
+      ],
+      name: "load_reservations_suggestion_load_org_fk",
+    }),
   }),
 );
 
