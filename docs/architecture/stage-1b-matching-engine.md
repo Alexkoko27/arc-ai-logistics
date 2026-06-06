@@ -1,5 +1,11 @@
 # Stage 1B Matching Engine
 
+> Stage 1D closure clarification: this document is historical Stage 1B
+> matching/reservation context. Reservation language here means temporary
+> operational hold only; it does not mean booking, dispatch, shipment
+> progression, or conversion into an execution workflow. See
+> `docs/architecture/stage-1d-closure-boundaries.md`.
+
 Stage 1B adds backend-only development tooling for dispatcher operations:
 
 - deterministic mock operational data
@@ -59,7 +65,8 @@ If the live load or vehicle changes later, the suggestion still preserves what t
 
 ## Reservation Locking
 
-`lib/dispatch/reservationService.ts` creates active `load_reservations` and then updates related operational state:
+`lib/dispatch/reservationService.ts` creates active `load_reservations` and
+then updates related planning hold visibility:
 
 - related `load_suggestions.status` becomes `reserved`
 - related `loads.status` becomes `reserved`

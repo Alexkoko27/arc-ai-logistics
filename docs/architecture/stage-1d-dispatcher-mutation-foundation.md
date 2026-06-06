@@ -1,5 +1,12 @@
 # Stage 1D Dispatcher Mutation Foundation
 
+> Stage 1D closure clarification: this foundation document predates the closure
+> boundary review. Current Stage 1D dispatcher ownership is limited to
+> operational planning visibility and temporary reservation holds. It does not
+> include execution workflow, orchestration, shipment lifecycle, dispatch
+> execution, or hidden state progression. See
+> `docs/architecture/stage-1d-closure-boundaries.md`.
+
 Stage 1D is split because dispatcher mutations are more sensitive than the
 read-only cockpit. Creating loads, editing vehicles, reserving loads, and
 releasing reservations all change operational state and can create race

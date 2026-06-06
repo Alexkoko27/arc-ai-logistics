@@ -1,5 +1,12 @@
 # Stage 1A Dispatcher Database Foundation
 
+> Stage 1D closure clarification: this Stage 1A document is historical schema
+> foundation context. Execution-domain tables and statuses listed here
+> (`deals`, `shipments`, `dispatches`, booking/dispatch/assignment/completion
+> timestamps) are inert future-schema placeholders for Stage 1D and are outside
+> active Stage 1D dispatcher ownership. See
+> `docs/architecture/stage-1d-closure-boundaries.md`.
+
 ## Scope
 
 Stage 1A adds the database foundation for the production-oriented dispatcher
@@ -19,7 +26,7 @@ The dispatcher architecture keeps these concepts separate:
 - `LoadSuggestion`: an immutable AI recommendation for one load and one vehicle
   in one matching run.
 - `LoadReservation`: a temporary lock that prevents double-booking while a
-  dispatcher evaluates or converts a load.
+  dispatcher evaluates a planning hold.
 - `Deal`: the commercial agreement or negotiation state with a counterparty.
 - `Shipment`: the accepted transport obligation.
 - `Dispatch`: assignment of a vehicle and driver to a shipment.
