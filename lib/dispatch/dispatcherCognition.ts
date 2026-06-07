@@ -93,7 +93,7 @@ export type OperationalFocusQueueItem = {
 const operationalReasoningText = {
   currentPlanningContext: "Current planning context",
   currentPlanningContextCategory: "current planning context",
-  elevatedDecisionSupportSignals: "No elevated decision-support signals",
+  elevatedDecisionSupportSignals: "No elevated planning review signals",
   matchingConfidence: "Matching confidence",
   limitedMatchingConfidence: "limited matching confidence",
   matchingContextUnavailable: "Matching context unavailable",

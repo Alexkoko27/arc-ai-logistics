@@ -327,7 +327,7 @@ function DecisionSupportSection({
   return (
     <section className="space-y-3">
       <SectionHeader
-        title="Decision Support"
+        title="Planning Review Support"
         description="Read-only planning signals grouped by review priority and confidence context."
       />
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
@@ -750,7 +750,7 @@ function SuggestionCard({
     ? "Temporary hold exists, so this suggestion deserves human review before any next operational step."
     : matchingFreshness.state === "fresh"
       ? "Matching context is current enough for dispatcher review, but remains read-only planning support."
-      : "Matching context is stale, so the suggestion should not be treated as current operational guidance.";
+      : "Matching context is stale, so the suggestion should not be treated as current planning support.";
 
   return (
     <article className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
