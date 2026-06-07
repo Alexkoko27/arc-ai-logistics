@@ -352,6 +352,16 @@ function DecisionSupportSection({
                   <p className="mt-3 text-xs leading-5 text-gray-500">
                     {item.reason}
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {item.reasoningFactors.map((factor) => (
+                      <span
+                        key={factor}
+                        className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-600"
+                      >
+                        {factor}
+                      </span>
+                    ))}
+                  </div>
                 </article>
               ))}
             </div>
@@ -396,6 +406,16 @@ function OperationalFocusSection({
               </span>
             </div>
             <p className="mt-3 text-xs leading-5 text-gray-500">{item.reason}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {item.reasoningFactors.map((factor) => (
+                <span
+                  key={factor}
+                  className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600"
+                >
+                  {factor}
+                </span>
+              ))}
+            </div>
           </article>
         ))}
       </div>

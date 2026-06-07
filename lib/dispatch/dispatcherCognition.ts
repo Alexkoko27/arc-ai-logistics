@@ -51,6 +51,7 @@ export type DecisionSupportSignal = {
   title: string;
   summary: string;
   reason: string;
+  reasoningFactors: string[];
 };
 
 export type OperationalReviewPriorityGroup = {
@@ -74,6 +75,7 @@ export type OperationalFocusQueueItem = {
   category: OperationalFocusCategory;
   title: string;
   reason: string;
+  reasoningFactors: string[];
   source: string;
   tone: AttentionTone;
 };
@@ -83,6 +85,7 @@ const operationalReasoningText = {
   currentPlanningContextCategory: "current planning context",
   elevatedDecisionSupportSignals: "No elevated decision-support signals",
   matchingConfidence: "Matching confidence",
+  limitedMatchingConfidence: "limited matching confidence",
   matchingContextUnavailable: "Matching context unavailable",
   matchingConfidenceReview: "matching confidence review",
   matchingReview: "Matching review",
@@ -93,12 +96,15 @@ const operationalReasoningText = {
     "No suggestion-level reasoning limitation is currently visible.",
   planningAvailabilityReview: "planning availability review",
   planningConfidenceLimited: "Planning confidence is limited",
+  planningVisibilityReduced: "planning visibility reduced",
   reservationRisk: "reservation risk",
+  reservationTimingUncertaintyFactor: "reservation timing uncertainty",
   reservationTimingUncertainty:
     "Reservation timing uncertainty reduces planning confidence for affected loads.",
   staleMatching: "Stale matching",
   staleOperationalContext: "stale operational context",
   temporaryHoldReview: "Temporary hold review",
+  unavailablePlanningSuggestion: "unavailable planning suggestion",
   visibilityReduced:
     "Planning visibility is reduced until unavailable suggestions are reviewed.",
 } as const;
@@ -247,6 +253,10 @@ function sortDecisionSignals(signals: DecisionSupportSignal[]) {
   );
 }
 
+function reasoningFactors(...factors: string[]) {
+  return factors;
+}
+
 export function buildOperationalFreshnessItems({
   activeReservations,
   matchingFreshness,
@@ -359,6 +369,12 @@ export function buildDispatcherDecisionSupportSignals({
       title: operationalReasoningText.matchingConfidence,
       summary: matchingContextLabel(matchingFreshness.state),
       reason: `${matchingFreshness.detail} ${matchingFreshness.confidenceLabel}.`,
+      reasoningFactors: reasoningFactors(
+        operationalReasoningText.limitedMatchingConfidence,
+        matchingFreshness.state === "stale"
+          ? operationalReasoningText.staleOperationalContext
+          : focusCategoryBySignalId["matching-confidence"],
+      ),
     });
   }
 
@@ -371,6 +387,10 @@ export function buildDispatcherDecisionSupportSignals({
       summary: `${expiringHoldCount} active holds near expiration`,
       reason:
         "Operational review should consider temporary hold availability before reservation timing changes reservability.",
+      reasoningFactors: reasoningFactors(
+        operationalReasoningText.reservationRisk,
+        operationalReasoningText.reservationTimingUncertaintyFactor,
+      ),
     });
   }
 
@@ -383,6 +403,10 @@ export function buildDispatcherDecisionSupportSignals({
       summary: `${suggestionReviewCount} suggestions unavailable for reservation review`,
       reason:
         "Operational review should consider suggested matches with readiness, hold, status, or matching-context limitations.",
+      reasoningFactors: reasoningFactors(
+        operationalReasoningText.unavailablePlanningSuggestion,
+        operationalReasoningText.planningVisibilityReduced,
+      ),
     });
   }
 
@@ -395,6 +419,12 @@ export function buildDispatcherDecisionSupportSignals({
       summary: `${matchingReviewLoadCount} matching review, ${unavailableLoadCount} unavailable`,
       reason:
         "Operational review should separate loads limited by matching context from loads unavailable by current load state.",
+      reasoningFactors: reasoningFactors(
+        operationalReasoningText.planningAvailabilityReview,
+        matchingReviewLoadCount > 0
+          ? operationalReasoningText.limitedMatchingConfidence
+          : operationalReasoningText.planningVisibilityReduced,
+      ),
     });
   }
 
@@ -407,6 +437,12 @@ export function buildDispatcherDecisionSupportSignals({
       summary: `${matchingReviewVehicleCount} matching review, ${unavailableVehicleCount} unavailable`,
       reason:
         "Operational review should separate vehicles limited by matching context from vehicles unavailable by current vehicle state.",
+      reasoningFactors: reasoningFactors(
+        operationalReasoningText.planningAvailabilityReview,
+        matchingReviewVehicleCount > 0
+          ? operationalReasoningText.limitedMatchingConfidence
+          : operationalReasoningText.planningVisibilityReduced,
+      ),
     });
   }
 
@@ -418,6 +454,9 @@ export function buildDispatcherDecisionSupportSignals({
       title: operationalReasoningText.currentPlanningContext,
       summary: operationalReasoningText.elevatedDecisionSupportSignals,
       reason: "Current freshness, readiness, suggestions, and temporary holds do not require elevated review.",
+      reasoningFactors: reasoningFactors(
+        operationalReasoningText.currentPlanningContextCategory,
+      ),
     });
   }
 
@@ -446,6 +485,7 @@ export function buildOperationalFocusQueue(
       category: focusCategoryForSignal(signal),
       title: signal.title,
       reason: signal.reason,
+      reasoningFactors: signal.reasoningFactors,
       source: signal.summary,
       tone: signal.tone,
     }));
