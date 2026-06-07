@@ -109,14 +109,26 @@ function locationLabel(
   return [location.label, cityState].filter(Boolean).join(" - ");
 }
 
-function loadStopLabel(load: DispatcherLoadView, stopType: "pickup" | "dropoff") {
+function loadStopLabel(
+  load: DispatcherLoadView,
+  stopType: "pickup" | "dropoff",
+) {
   const stop = load.stops.find((candidate) => candidate.stopType === stopType);
   if (!stop?.location) return "Unknown";
   return locationLabel(stop.location);
 }
 
 function statusClass(status: string) {
-  if (["available", "reservable", "suggested", "completed", "active", "fresh"].includes(status)) {
+  if (
+    [
+      "available",
+      "reservable",
+      "suggested",
+      "completed",
+      "active",
+      "fresh",
+    ].includes(status)
+  ) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
@@ -150,7 +162,8 @@ function statusClass(status: string) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const label = status === "completed" ? "reviewed" : status.replaceAll("_", " ");
+  const label =
+    status === "completed" ? "reviewed" : status.replaceAll("_", " ");
 
   return (
     <span
@@ -205,7 +218,8 @@ function MetricCard({
 }
 
 function freshnessToneClass(tone: FreshnessTone) {
-  if (tone === "green") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (tone === "green")
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-700";
   return "border-gray-200 bg-gray-50 text-gray-600";
 }
@@ -292,7 +306,9 @@ function DispatcherAttentionSection({
                   {item.label}
                 </span>
               </div>
-              <p className="mt-3 text-xs leading-5 text-gray-500">{item.reason}</p>
+              <p className="mt-3 text-xs leading-5 text-gray-500">
+                {item.reason}
+              </p>
             </article>
           ))}
         </div>
@@ -340,8 +356,12 @@ function DecisionSupportSection({
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <h4 className="font-semibold text-gray-950">{item.title}</h4>
-                      <p className="mt-1 text-sm text-gray-600">{item.summary}</p>
+                      <h4 className="font-semibold text-gray-950">
+                        {item.title}
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {item.summary}
+                      </p>
                     </div>
                     <span
                       className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${attentionToneClass(
@@ -448,7 +468,9 @@ function OperationalFocusSection({
                 review
               </span>
             </div>
-            <p className="mt-3 text-xs leading-5 text-gray-500">{item.reason}</p>
+            <p className="mt-3 text-xs leading-5 text-gray-500">
+              {item.reason}
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {item.reasoningFactors.map((factor) => (
                 <span
@@ -583,7 +605,8 @@ function ReservationState({
     return <span className="text-sm text-gray-500">No active reservation</span>;
   }
 
-  const remainingMs = load.activeReservation.expiresAt.getTime() - now.getTime();
+  const remainingMs =
+    load.activeReservation.expiresAt.getTime() - now.getTime();
   const isStale = remainingMs <= HOLD_STALE_REMAINING_MINUTES * MINUTE_MS;
 
   return (
@@ -593,12 +616,21 @@ function ReservationState({
         {isStale ? <StatusBadge status="expiring" /> : null}
       </div>
       <p className="text-xs text-gray-500">
-        Age {formatDuration(now.getTime() - load.activeReservation.reservedAt.getTime())}
+        Age{" "}
+        {formatDuration(
+          now.getTime() - load.activeReservation.reservedAt.getTime(),
+        )}
       </p>
       <p className="text-xs text-gray-500">
         Expires {formatDate(load.activeReservation.expiresAt)}
       </p>
-      <p className={isStale ? "text-xs font-semibold text-amber-700" : "text-xs text-gray-500"}>
+      <p
+        className={
+          isStale
+            ? "text-xs font-semibold text-amber-700"
+            : "text-xs text-gray-500"
+        }
+      >
         {formatDuration(remainingMs)} remaining
       </p>
     </div>
@@ -713,7 +745,7 @@ function SuggestionCard({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Rank {suggestion.row.rank ?? "-"} recommendation
+            Rank {suggestion.row.rank ?? "-"} suggestion
           </p>
           <h3 className="mt-1 font-bold text-gray-950">
             {suggestion.vehicle?.unitNumber ?? "Vehicle"} for{" "}
@@ -796,7 +828,9 @@ function SuggestionCard({
 
       <div className="mt-4 grid gap-3 text-xs text-gray-600 lg:grid-cols-2">
         <div className="rounded-lg border border-gray-100 p-3">
-          <p className="font-semibold text-gray-700">LoadSuggestion.load_snapshot</p>
+          <p className="font-semibold text-gray-700">
+            LoadSuggestion.load_snapshot
+          </p>
           <p className="mt-1 leading-5">{suggestion.loadSnapshotSummary}</p>
         </div>
         <div className="rounded-lg border border-gray-100 p-3">
@@ -823,10 +857,15 @@ function ReservationActivityList({
       {items.length > 0 ? (
         <div className="mt-3 space-y-3">
           {items.map((item) => (
-            <article key={item.reservationId} className="rounded-md bg-gray-50 p-3 text-sm">
+            <article
+              key={item.reservationId}
+              className="rounded-md bg-gray-50 p-3 text-sm"
+            >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="font-semibold text-gray-950">{item.loadReference}</p>
+                  <p className="font-semibold text-gray-950">
+                    {item.loadReference}
+                  </p>
                   <p className="mt-1 font-mono text-xs text-gray-500">
                     {item.suggestionReference}
                   </p>
@@ -843,7 +882,9 @@ function ReservationActivityList({
                   <dd className="mt-1">{formatDate(item.updatedAt)}</dd>
                 </div>
                 <div>
-                  <dt className="font-semibold text-gray-700">Released/expired</dt>
+                  <dt className="font-semibold text-gray-700">
+                    Released/expired
+                  </dt>
                   <dd className="mt-1">{formatDate(item.releasedAt)}</dd>
                 </div>
               </dl>
@@ -873,9 +914,18 @@ function ReservationActivitySection({
         description="Read-only lifecycle visibility for temporary operational holds. Released and expired records are history only."
       />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <ReservationActivityList title="Recent Active" items={activity.active} />
-        <ReservationActivityList title="Recent Released" items={activity.released} />
-        <ReservationActivityList title="Recent Expired" items={activity.expired} />
+        <ReservationActivityList
+          title="Recent Active"
+          items={activity.active}
+        />
+        <ReservationActivityList
+          title="Recent Released"
+          items={activity.released}
+        />
+        <ReservationActivityList
+          title="Recent Expired"
+          items={activity.expired}
+        />
       </div>
     </section>
   );
@@ -892,7 +942,8 @@ export default async function DispatcherCockpitPage() {
   const matchingIsStale =
     matchingAgeMs !== null &&
     matchingAgeMs > MATCHING_STALE_AFTER_MINUTES * MINUTE_MS;
-  const matchingIsReady = latestRun !== null && matchingIsCompleted && !matchingIsStale;
+  const matchingIsReady =
+    latestRun !== null && matchingIsCompleted && !matchingIsStale;
   const matchingFreshnessSnapshotValue = matchingFreshnessSnapshot({
     ageMs: matchingAgeMs,
     formatDate,
@@ -901,13 +952,14 @@ export default async function DispatcherCockpitPage() {
     latestRun,
     minuteMs: MINUTE_MS,
   });
-  const reservationMatchingFreshness = latestRun && matchingIsCompleted
-    ? {
-        generatedAtLabel: formatDate(latestRun.row.createdAt),
-        ageLabel: `${formatDuration(matchingAgeMs ?? 0)} old`,
-        isStale: matchingIsStale,
-      }
-    : null;
+  const reservationMatchingFreshness =
+    latestRun && matchingIsCompleted
+      ? {
+          generatedAtLabel: formatDate(latestRun.row.createdAt),
+          ageLabel: `${formatDuration(matchingAgeMs ?? 0)} old`,
+          isStale: matchingIsStale,
+        }
+      : null;
   const activeReservationByVehicleId = new Map(
     data.loads
       .map((load) => load.activeReservation)
@@ -916,8 +968,8 @@ export default async function DispatcherCockpitPage() {
       )
       .map((reservation) => [reservation.vehicleId, reservation]),
   );
-  const reservationSuggestions: ReservationActionSuggestion[] = data.suggestions.map(
-    (suggestion) => {
+  const reservationSuggestions: ReservationActionSuggestion[] =
+    data.suggestions.map((suggestion) => {
       const staleReason = staleReasonForSuggestion({
         suggestion,
         matchingFreshnessState: matchingFreshnessSnapshotValue.state,
@@ -930,7 +982,9 @@ export default async function DispatcherCockpitPage() {
         vehicleId: suggestion.row.vehicleId,
         label: [
           suggestion.vehicle?.unitNumber ?? "Vehicle",
-          suggestion.load?.referenceNumber ?? suggestion.load?.externalId ?? "load",
+          suggestion.load?.referenceNumber ??
+            suggestion.load?.externalId ??
+            "load",
         ].join(" for "),
         scoreLabel: suggestion.row.scoreTotal
           ? `(score ${formatScore(suggestion.row.scoreTotal)})`
@@ -938,15 +992,17 @@ export default async function DispatcherCockpitPage() {
         status: suggestion.row.status,
         loadStatus: suggestion.load?.status ?? "unknown",
         isReservable: staleReason === null,
-        isStale: staleReason !== null && matchingFreshnessSnapshotValue.state === "stale",
+        isStale:
+          staleReason !== null &&
+          matchingFreshnessSnapshotValue.state === "stale",
         staleReason: staleReason ?? undefined,
       };
-    },
-  );
+    });
   const reservableSuggestionCount = reservationSuggestions.filter(
     (suggestion) => suggestion.isReservable,
   ).length;
-  const suggestionReviewCount = reservationSuggestions.length - reservableSuggestionCount;
+  const suggestionReviewCount =
+    reservationSuggestions.length - reservableSuggestionCount;
   const reservableLoadIds = new Set(
     reservationSuggestions
       .filter((suggestion) => suggestion.isReservable)
@@ -1030,7 +1086,9 @@ export default async function DispatcherCockpitPage() {
         ageLabel: reservation
           ? formatDuration(now.getTime() - reservation.reservedAt.getTime())
           : "unknown",
-        countdownLabel: reservation ? `${formatDuration(remainingMs)} remaining` : "unknown",
+        countdownLabel: reservation
+          ? `${formatDuration(remainingMs)} remaining`
+          : "unknown",
         isStale: remainingMs <= HOLD_STALE_REMAINING_MINUTES * MINUTE_MS,
       };
     });
@@ -1073,7 +1131,9 @@ export default async function DispatcherCockpitPage() {
       freshnessItems: operationalFreshnessItems,
       signals: decisionSupportSignals,
     });
-  const operationalFocusQueue = buildOperationalFocusQueue(decisionSupportSignals);
+  const operationalFocusQueue = buildOperationalFocusQueue(
+    decisionSupportSignals,
+  );
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
@@ -1283,7 +1343,9 @@ export default async function DispatcherCockpitPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <StatusBadge status={latestRun.row.status} />
-                      <StatusBadge status={matchingFreshnessSnapshotValue.state} />
+                      <StatusBadge
+                        status={matchingFreshnessSnapshotValue.state}
+                      />
                       <span className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600">
                         Created {formatDate(latestRun.row.createdAt)}
                       </span>
@@ -1342,7 +1404,7 @@ export default async function DispatcherCockpitPage() {
           <section className="space-y-3">
             <SectionHeader
               title="Load Suggestions"
-              description="Ranked persisted recommendations. Stale matching output is visible but not offered as reservable."
+              description="Ranked persisted suggestions. Stale matching output is visible but not offered as reservable."
             />
             {data.suggestions.length > 0 ? (
               <div className="grid grid-cols-1 gap-3">
