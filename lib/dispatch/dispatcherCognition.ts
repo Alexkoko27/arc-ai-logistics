@@ -62,6 +62,16 @@ export type OperationalReviewPriorityGroup = {
   items: DecisionSupportSignal[];
 };
 
+export type PlanningContextConsistencySummary = {
+  label:
+    | "Stable planning context"
+    | "Review-sensitive planning context"
+    | "Limited planning confidence";
+  tone: AttentionTone;
+  reason: string;
+  factors: string[];
+};
+
 export type OperationalFocusCategory =
   | "reservation risk"
   | "stale operational context"
@@ -90,6 +100,7 @@ const operationalReasoningText = {
   matchingConfidenceReview: "matching confidence review",
   matchingReview: "Matching review",
   matchingReviewPending: "Matching review pending",
+  noElevatedReviewFactors: "no elevated review factors",
   noVisibleReservationTimingLimitation:
     "No reservation timing limitation is currently visible.",
   noVisibleSuggestionLimitation:
@@ -255,6 +266,10 @@ function sortDecisionSignals(signals: DecisionSupportSignal[]) {
 
 function reasoningFactors(...factors: string[]) {
   return factors;
+}
+
+function uniqueReasoningFactors(factors: string[]) {
+  return Array.from(new Set(factors));
 }
 
 export function buildOperationalFreshnessItems({
@@ -472,6 +487,54 @@ export function buildOperationalReviewPriorityGroups(
       items: signals.filter((signal) => signal.priority === group.id),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+export function buildPlanningContextConsistencySummary({
+  freshnessItems,
+  signals,
+}: {
+  freshnessItems: OperationalFreshnessItem[];
+  signals: DecisionSupportSignal[];
+}): PlanningContextConsistencySummary {
+  const sortedSignals = sortDecisionSignals(signals);
+  const reviewFirstSignals = sortedSignals.filter(
+    (signal) => signal.priority === "review first",
+  );
+  const highAttentionSignals = sortedSignals.filter(
+    (signal) => signal.priority === "high attention",
+  );
+  const reasoningFactorSummary = uniqueReasoningFactors(
+    sortedSignals.flatMap((signal) => signal.reasoningFactors),
+  );
+  const hasFreshnessLimit = freshnessItems.some((item) => item.tone === "amber");
+
+  if (reviewFirstSignals.length > 0) {
+    return {
+      label: "Limited planning confidence",
+      tone: "amber",
+      reason:
+        "Review-first cognition signals indicate the current planning picture should be reviewed before relying on readiness.",
+      factors: reasoningFactorSummary.slice(0, 4),
+    };
+  }
+
+  if (highAttentionSignals.length > 0 || hasFreshnessLimit) {
+    return {
+      label: "Review-sensitive planning context",
+      tone: "blue",
+      reason:
+        "Current planning visibility is usable, with derived review signals that may limit confidence in parts of the context.",
+      factors: reasoningFactorSummary.slice(0, 4),
+    };
+  }
+
+  return {
+    label: "Stable planning context",
+    tone: "blue",
+    reason:
+      "Current cognition signals do not show elevated review pressure across freshness, readiness, suggestions, or temporary holds.",
+    factors: [operationalReasoningText.noElevatedReviewFactors],
+  };
 }
 
 export function buildOperationalFocusQueue(

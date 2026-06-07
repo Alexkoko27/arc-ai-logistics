@@ -21,9 +21,11 @@ import {
   buildOperationalFocusQueue,
   buildOperationalFreshnessItems,
   buildOperationalReviewPriorityGroups,
+  buildPlanningContextConsistencySummary,
   type OperationalFocusQueueItem,
   type OperationalFreshnessItem,
   type OperationalReviewPriorityGroup,
+  type PlanningContextConsistencySummary,
 } from "@/lib/dispatch/dispatcherCognition";
 import {
   MATCHING_STALE_AFTER_MINUTES,
@@ -366,6 +368,47 @@ function DecisionSupportSection({
               ))}
             </div>
           </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PlanningContextConsistencySection({
+  summary,
+}: {
+  summary: PlanningContextConsistencySummary;
+}) {
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Planning Context
+          </p>
+          <h2 className="mt-1 text-lg font-bold text-gray-950">
+            {summary.label}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-gray-600">
+            {summary.reason}
+          </p>
+        </div>
+        <span
+          className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${attentionToneClass(
+            summary.tone,
+          )}`}
+        >
+          read-only summary
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {summary.factors.map((factor) => (
+          <span
+            key={factor}
+            className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600"
+          >
+            {factor}
+          </span>
         ))}
       </div>
     </section>
@@ -1025,6 +1068,11 @@ export default async function DispatcherCockpitPage() {
   const decisionSupportGroups = buildOperationalReviewPriorityGroups(
     decisionSupportSignals,
   );
+  const planningContextConsistencySummary =
+    buildPlanningContextConsistencySummary({
+      freshnessItems: operationalFreshnessItems,
+      signals: decisionSupportSignals,
+    });
   const operationalFocusQueue = buildOperationalFocusQueue(decisionSupportSignals);
 
   return (
@@ -1172,6 +1220,10 @@ export default async function DispatcherCockpitPage() {
               description="Unavailable due to readiness, hold, status, or matching context."
             />
           </section>
+
+          <PlanningContextConsistencySection
+            summary={planningContextConsistencySummary}
+          />
 
           <OperationalFocusSection items={operationalFocusQueue} />
 
