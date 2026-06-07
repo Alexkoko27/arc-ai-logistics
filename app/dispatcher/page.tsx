@@ -740,6 +740,18 @@ function SuggestionCard({
     ? `Active reservation until ${formatDate(activeReservation.expiresAt)}`
     : "No active reservation";
 
+  const reviewReadinessLabel = activeReservation
+    ? "Ready for operator review"
+    : matchingFreshness.state === "fresh"
+      ? "Ready for planning review"
+      : "Stale planning context";
+
+  const reviewReadinessReason = activeReservation
+    ? "Temporary hold exists, so this suggestion deserves human review before any next operational step."
+    : matchingFreshness.state === "fresh"
+      ? "Matching context is current enough for dispatcher review, but remains read-only planning support."
+      : "Matching context is stale, so the suggestion should not be treated as current operational guidance.";
+
   return (
     <article className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -810,6 +822,18 @@ function SuggestionCard({
       <p className="mt-3 text-xs font-semibold text-gray-500">
         {matchingFreshness.confidenceLabel}
       </p>
+
+      <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Review readiness
+        </p>
+        <p className="mt-1 font-semibold text-gray-950">
+          {reviewReadinessLabel}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-gray-600">
+          {reviewReadinessReason}
+        </p>
+      </div>
 
       <div className="mt-4 grid gap-3 text-sm lg:grid-cols-2">
         <div>
