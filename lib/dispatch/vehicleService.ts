@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { vehicles } from "../db/schema";
+import { loadReservations, vehicles } from "../db/schema";
 import { assertDevDispatcherDatabaseTarget } from "./devDatabaseGuard";
 import type {
   DispatcherCreateVehicleInput,
@@ -29,7 +29,8 @@ export type DispatcherVehicleDomainErrorCode =
   | "VEHICLE_NOT_FOUND"
   | "VEHICLE_NO_CHANGES"
   | "VEHICLE_DUPLICATE_UNIT_NUMBER"
-  | "VEHICLE_INVALID_AVAILABILITY";
+  | "VEHICLE_INVALID_AVAILABILITY"
+  | "VEHICLE_NOT_EDITABLE_WHILE_RESERVED";
 
 export class DispatcherVehicleDomainError extends Error {
   constructor(
@@ -64,7 +65,10 @@ function nullableEqual(left: unknown, right: unknown) {
   return (left ?? null) === (right ?? null);
 }
 
-function assertVehicleAvailability(status: string | undefined, expectedAvailableAt: Date | null) {
+function assertVehicleAvailability(
+  status: string | undefined,
+  expectedAvailableAt: Date | null,
+) {
   if (status === "available_soon" && !expectedAvailableAt) {
     throw new DispatcherVehicleDomainError(
       "VEHICLE_INVALID_AVAILABILITY",
@@ -73,17 +77,16 @@ function assertVehicleAvailability(status: string | undefined, expectedAvailable
   }
 }
 
-function vehicleFields(
-  input: DispatcherVehicleMutationInput,
-): VehicleUpdate {
+function vehicleFields(input: DispatcherVehicleMutationInput): VehicleUpdate {
   return {
     unitNumber: "unitNumber" in input ? input.unitNumber : undefined,
     vin: "vin" in input ? nullable(input.vin) : undefined,
-    equipmentType:
-      "equipmentType" in input ? input.equipmentType : undefined,
+    equipmentType: "equipmentType" in input ? input.equipmentType : undefined,
     status: "status" in input ? input.status : undefined,
     expectedAvailableAt:
-      "expectedAvailableAt" in input ? toDate(input.expectedAvailableAt) : undefined,
+      "expectedAvailableAt" in input
+        ? toDate(input.expectedAvailableAt)
+        : undefined,
     updatedAt: new Date(),
   };
 }
@@ -97,10 +100,7 @@ function vehicleFieldChanged(
     return !datesEqual(existingVehicle.expectedAvailableAt, value as DateInput);
   }
 
-  return !nullableEqual(
-    existingVehicle[key as keyof VehicleRow],
-    value,
-  );
+  return !nullableEqual(existingVehicle[key as keyof VehicleRow], value);
 }
 
 function isDuplicateUnitNumberConflict(error: unknown) {
@@ -133,6 +133,27 @@ function duplicateUnitNumberError(error: unknown) {
     "Vehicle unit number already exists for this organization.",
     { cause: error },
   );
+}
+
+async function getActiveReservationForVehicle(
+  db: MutationDb,
+  organizationId: string,
+  vehicleId: string,
+) {
+  return (
+    await db
+      .select({ id: loadReservations.id })
+      .from(loadReservations)
+      .where(
+        and(
+          eq(loadReservations.organizationId, organizationId),
+          eq(loadReservations.vehicleId, vehicleId),
+          eq(loadReservations.status, "active"),
+          sql`${loadReservations.expiresAt} > now()`,
+        ),
+      )
+      .limit(1)
+  )[0];
 }
 
 async function createDispatcherVehicleWithDb(
@@ -202,8 +223,23 @@ async function editDispatcherVehicleWithDb(
     );
   }
 
+  const activeReservation = await getActiveReservationForVehicle(
+    db,
+    input.organizationId,
+    input.vehicleId,
+  );
+
+  if (activeReservation) {
+    throw new DispatcherVehicleDomainError(
+      "VEHICLE_NOT_EDITABLE_WHILE_RESERVED",
+      "Vehicle cannot be edited while it is tied to an active reservation.",
+    );
+  }
+
   const effectiveStatus =
-    typeof fieldsToSet.status === "string" ? fieldsToSet.status : existingVehicle.status;
+    typeof fieldsToSet.status === "string"
+      ? fieldsToSet.status
+      : existingVehicle.status;
   const effectiveExpectedAvailableAt =
     "expectedAvailableAt" in fieldsToSet
       ? (fieldsToSet.expectedAvailableAt as Date | null)
@@ -240,7 +276,9 @@ export async function createDispatcherVehicle(
   assertDevDispatcherDatabaseTarget("create dispatcher vehicle");
 
   try {
-    return await db.transaction((tx) => createDispatcherVehicleWithDb(tx, input));
+    return await db.transaction((tx) =>
+      createDispatcherVehicleWithDb(tx, input),
+    );
   } catch (error) {
     if (isDuplicateUnitNumberConflict(error)) {
       throw duplicateUnitNumberError(error);

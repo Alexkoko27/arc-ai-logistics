@@ -14,6 +14,7 @@ export type DispatcherMutationErrorCode =
   | "LOAD_RESERVATION_CONFLICT"
   | "LOAD_SUGGESTION_NOT_RESERVABLE"
   | "RESERVATION_NOT_FOUND"
+  | "VEHICLE_NOT_EDITABLE_WHILE_RESERVED"
   | "UNKNOWN_ERROR";
 
 export type DispatcherMutationActionResult = {

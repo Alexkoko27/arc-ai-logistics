@@ -46,7 +46,12 @@ export type MatchingExplanationItem = {
   source: string;
 };
 export type FreshnessTone = "green" | "amber" | "gray";
-export type FreshnessState = "fresh" | "aging" | "stale" | "pending" | "unavailable";
+export type FreshnessState =
+  | "fresh"
+  | "aging"
+  | "stale"
+  | "pending"
+  | "unavailable";
 export type MatchingFreshnessSnapshot = {
   state: FreshnessState;
   tone: FreshnessTone;
@@ -114,7 +119,8 @@ export function matchingFreshnessSnapshot({
       tone: "gray",
       ageLabel: `${formatDuration(ageMs)} old`,
       confidenceLabel: "Matching run not ready",
-      detail: "Matching run is not ready, so freshness age is informational only.",
+      detail:
+        "Matching run is not ready, so freshness age is informational only.",
       generatedAtLabel: formatDate(latestRun.row.createdAt),
       staleDurationLabel: null,
     };
@@ -137,7 +143,7 @@ export function matchingFreshnessSnapshot({
       state: "aging",
       tone: "amber",
       ageLabel: `${formatDuration(ageMs)} old`,
-      confidenceLabel: "Moderate operational confidence",
+      confidenceLabel: "Moderate planning confidence",
       detail: "Matching context is still current but aging.",
       generatedAtLabel: formatDate(latestRun.row.createdAt),
       staleDurationLabel: null,
@@ -148,7 +154,7 @@ export function matchingFreshnessSnapshot({
     state: "fresh",
     tone: "green",
     ageLabel: `${formatDuration(ageMs)} old`,
-    confidenceLabel: "High operational confidence",
+    confidenceLabel: "High planning confidence",
     detail: "Matching context was updated recently.",
     generatedAtLabel: formatDate(latestRun.row.createdAt),
     staleDurationLabel: null,
@@ -158,7 +164,8 @@ export function matchingFreshnessSnapshot({
 function matchingContextLabel(matchingFreshnessState: FreshnessState) {
   if (matchingFreshnessState === "stale") return "Stale matching";
   if (matchingFreshnessState === "pending") return "Matching review pending";
-  if (matchingFreshnessState === "unavailable") return "Matching context unavailable";
+  if (matchingFreshnessState === "unavailable")
+    return "Matching context unavailable";
   return "Matching review";
 }
 
@@ -219,7 +226,8 @@ export function loadReadiness({
 
   return {
     status: "reservable",
-    reason: "Available load with a fresh reservable suggestion and no active hold.",
+    reason:
+      "Available load with a fresh reservable suggestion and no active hold.",
   };
 }
 
@@ -274,7 +282,8 @@ export function staleReasonForSuggestion({
   matchingFreshnessState: FreshnessState;
 }) {
   if (!matchingIsReady) return matchingContextReason(matchingFreshnessState);
-  if (suggestion.row.status !== "suggested") return `suggestion is ${suggestion.row.status}`;
+  if (suggestion.row.status !== "suggested")
+    return `suggestion is ${suggestion.row.status}`;
   if (suggestion.load?.status !== "available") {
     return `load is ${suggestion.load?.status ?? "unavailable"}`;
   }
@@ -317,20 +326,27 @@ export function buildDispatcherAttentionItems({
     });
   }
 
-  for (const suggestion of reservationSuggestions.filter(suggestionNeedsReview).slice(0, 4)) {
+  for (const suggestion of reservationSuggestions
+    .filter(suggestionNeedsReview)
+    .slice(0, 4)) {
     items.push({
       id: `suggestion:${suggestion.suggestionId}`,
       tone: "gray",
       label: suggestion.isStale ? "Stale matching" : "Review suggestion",
       title: suggestion.label,
       detail: suggestion.scoreLabel || "Review suggested match",
-      reason: suggestion.staleReason ?? "Suggestion is unavailable for reservation.",
+      reason:
+        suggestion.staleReason ?? "Suggestion is unavailable for reservation.",
     });
   }
 
   data.loads.forEach((load, index) => {
     const readiness = loadReadinessItems[index];
-    if (!readiness || readiness.status === "reservable" || readiness.status === "reserved") {
+    if (
+      !readiness ||
+      readiness.status === "reservable" ||
+      readiness.status === "reserved"
+    ) {
       return;
     }
 
@@ -349,7 +365,11 @@ export function buildDispatcherAttentionItems({
 
   data.vehicles.forEach((vehicle, index) => {
     const readiness = vehicleReadinessItems[index];
-    if (!readiness || readiness.status === "available" || readiness.status === "reserved") {
+    if (
+      !readiness ||
+      readiness.status === "available" ||
+      readiness.status === "reserved"
+    ) {
       return;
     }
 
@@ -413,7 +433,9 @@ export function buildMatchingExplanationItems({
     });
   }
 
-  for (const suggestion of reservationSuggestions.filter(suggestionNeedsReview)) {
+  for (const suggestion of reservationSuggestions.filter(
+    suggestionNeedsReview,
+  )) {
     items.push({
       id: `suggestion:${suggestion.suggestionId}`,
       tone: "gray",
