@@ -484,6 +484,59 @@ export const loadReservations = pgTable(
   }),
 );
 
+export const dispatcherContextFacts = pgTable(
+  "dispatcher_context_facts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    entityType: text("entity_type").notNull(),
+    entityId: uuid("entity_id").notNull(),
+    contextKey: text("context_key").notNull(),
+    contextValue: text("context_value").notNull(),
+    sourceType: text("source_type").notNull().default("dispatcher_entered"),
+    confidence: numeric("confidence", { precision: 5, scale: 4 })
+      .notNull()
+      .default("1"),
+    sourceNote: text("source_note"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
+    ...timestamps(),
+  },
+  (table) => ({
+    organizationEntityIdx: index("dispatcher_context_facts_org_entity_idx").on(
+      table.organizationId,
+      table.entityType,
+      table.entityId,
+    ),
+    organizationKeyIdx: index("dispatcher_context_facts_org_key_idx").on(
+      table.organizationId,
+      table.entityType,
+      table.contextKey,
+    ),
+    uniqueContextFactIdx: uniqueIndex(
+      "dispatcher_context_facts_unique_fact_idx",
+    ).on(
+      table.organizationId,
+      table.entityType,
+      table.entityId,
+      table.contextKey,
+    ),
+    entityTypeCheck: check(
+      "dispatcher_context_facts_entity_type_check",
+      sql`${table.entityType} IN ('driver', 'organization', 'load', 'load_stop')`,
+    ),
+    sourceTypeCheck: check(
+      "dispatcher_context_facts_source_type_check",
+      sql`${table.sourceType} IN ('dispatcher_entered', 'imported', 'system_inferred', 'ai_surfaced')`,
+    ),
+    confidenceCheck: check(
+      "dispatcher_context_facts_confidence_check",
+      sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`,
+    ),
+  }),
+);
+
 export const deals = pgTable(
   "deals",
   {
