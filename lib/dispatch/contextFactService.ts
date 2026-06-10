@@ -1,6 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { dispatcherContextFacts } from "../db/schema";
+import {
+  dispatcherContextFacts,
+  drivers,
+  loads,
+  loadStops,
+  organizations,
+} from "../db/schema";
 import { validateDispatcherContextFactInput } from "./dispatcherContextFacts";
 
 type Db = ReturnType<typeof getDb>;
@@ -66,6 +72,111 @@ function nullableText(value: string | undefined) {
   return trimmed ? trimmed : null;
 }
 
+async function assertContextFactEntityBelongsToOrganization(
+  input: Pick<
+    UpsertDispatcherContextFactInput,
+    "organizationId" | "entityType" | "entityId"
+  >,
+  db: MutationDb,
+) {
+  if (input.entityType === "organization") {
+    if (input.entityId !== input.organizationId) {
+      throw new DispatcherContextFactDomainError(
+        "Organization context fact entity must match organizationId.",
+      );
+    }
+
+    const existingOrganization = (
+      await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(eq(organizations.id, input.organizationId))
+        .limit(1)
+    )[0];
+
+    if (!existingOrganization) {
+      throw new DispatcherContextFactDomainError(
+        "Context fact organization does not exist.",
+      );
+    }
+
+    return;
+  }
+
+  if (input.entityType === "driver") {
+    const existingDriver = (
+      await db
+        .select({ id: drivers.id })
+        .from(drivers)
+        .where(
+          and(
+            eq(drivers.id, input.entityId),
+            eq(drivers.organizationId, input.organizationId),
+          ),
+        )
+        .limit(1)
+    )[0];
+
+    if (!existingDriver) {
+      throw new DispatcherContextFactDomainError(
+        "Context fact driver does not exist in this organization.",
+      );
+    }
+
+    return;
+  }
+
+  if (input.entityType === "load") {
+    const existingLoad = (
+      await db
+        .select({ id: loads.id })
+        .from(loads)
+        .where(
+          and(
+            eq(loads.id, input.entityId),
+            eq(loads.organizationId, input.organizationId),
+          ),
+        )
+        .limit(1)
+    )[0];
+
+    if (!existingLoad) {
+      throw new DispatcherContextFactDomainError(
+        "Context fact load does not exist in this organization.",
+      );
+    }
+
+    return;
+  }
+
+  if (input.entityType === "load_stop") {
+    const existingLoadStop = (
+      await db
+        .select({ id: loadStops.id })
+        .from(loadStops)
+        .where(
+          and(
+            eq(loadStops.id, input.entityId),
+            eq(loadStops.organizationId, input.organizationId),
+          ),
+        )
+        .limit(1)
+    )[0];
+
+    if (!existingLoadStop) {
+      throw new DispatcherContextFactDomainError(
+        "Context fact load stop does not exist in this organization.",
+      );
+    }
+
+    return;
+  }
+
+  throw new DispatcherContextFactDomainError(
+    `Unsupported context fact entity type: ${input.entityType}`,
+  );
+}
+
 export async function upsertDispatcherContextFact(
   input: UpsertDispatcherContextFactInput,
   db: MutationDb = getDb(),
@@ -79,6 +190,8 @@ export async function upsertDispatcherContextFact(
     contextKey: input.contextKey,
     contextValue: input.contextValue,
   });
+
+  await assertContextFactEntityBelongsToOrganization(input, db);
 
   const existing = (
     await db
