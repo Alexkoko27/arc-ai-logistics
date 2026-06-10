@@ -16,6 +16,7 @@ import {
   type DispatcherVehicleView,
   getDispatcherCockpitData,
 } from "@/lib/dispatch/cockpitQueries";
+import { getPlanningVisibleContextFacts } from "@/lib/dispatch/contextFactQueries";
 import {
   buildDispatcherDecisionSupportSignals,
   buildOperationalFocusQueue,
@@ -214,6 +215,75 @@ function MetricCard({
       <p className="mt-2 text-2xl font-bold text-gray-950">{value}</p>
       <p className="mt-1 text-xs text-gray-500">{description}</p>
     </div>
+  );
+}
+
+type PlanningVisibleContextFact = Awaited<
+  ReturnType<typeof getPlanningVisibleContextFacts>
+>[number];
+
+function formatConfidence(value: string) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return `Confidence ${value}`;
+
+  return `Confidence ${numericValue.toFixed(2)}`;
+}
+
+function PlanningContextFactsSection({
+  facts,
+}: {
+  facts: PlanningVisibleContextFact[];
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader
+        title="Planning Context Facts"
+        description="Read-only governed context observations. These facts are visible for dispatcher review only and do not create recommendations, assignments, readiness, or workflow authority."
+      />
+      {facts.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {facts.map((fact) => (
+            <article
+              key={fact.id}
+              className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {fact.entityType.replaceAll("_", " ")}
+                  </p>
+                  <h3 className="mt-1 font-bold text-gray-950">
+                    {fact.contextKey.replaceAll("_", " ")}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    {fact.contextValue}
+                  </p>
+                </div>
+                <StatusBadge status={fact.sourceType} />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                  {formatConfidence(fact.confidence)}
+                </span>
+                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                  Review context only
+                </span>
+              </div>
+              {fact.sourceNote ? (
+                <p className="mt-3 text-xs leading-5 text-gray-500">
+                  {fact.sourceNote}
+                </p>
+              ) : null}
+              <p className="mt-3 font-mono text-xs text-gray-400">
+                {fact.entityId}
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState label="No governed planning context facts found for this organization." />
+      )}
+    </section>
   );
 }
 
@@ -957,6 +1027,11 @@ function ReservationActivitySection({
 
 export default async function DispatcherCockpitPage() {
   const data = await getDispatcherCockpitData();
+  const planningVisibleContextFacts = data.organization
+    ? await getPlanningVisibleContextFacts({
+        organizationId: data.organization.id,
+      })
+    : [];
   const now = new Date();
   const latestRun = data.latestMatchingRun;
   const matchingAgeMs = latestRun
@@ -1308,6 +1383,8 @@ export default async function DispatcherCockpitPage() {
           <PlanningContextConsistencySection
             summary={planningContextConsistencySummary}
           />
+
+          <PlanningContextFactsSection facts={planningVisibleContextFacts} />
 
           <OperationalFocusSection items={operationalFocusQueue} />
 
