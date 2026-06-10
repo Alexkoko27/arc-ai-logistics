@@ -206,3 +206,19 @@ Load ≠ LoadSuggestion ≠ LoadReservation ≠ Deal ≠ Shipment ≠ Dispatch �
 
 It does not replace workflow entities.
 It does not collapse planning into execution.
+
+## Driver card semantics note
+
+`driver.card` is intentionally generic at this stage.
+
+It must not be interpreted as:
+
+- military access authorization
+- dispatch eligibility
+- broker/facility approval
+- driver assignment permission
+- execution readiness
+
+The exact real-world card taxonomy is not confirmed yet. The generic key is preserved until actual business terminology and card types are verified from dispatcher workflows or source systems.
+
+Future specific keys may be introduced only after the card taxonomy is known.
