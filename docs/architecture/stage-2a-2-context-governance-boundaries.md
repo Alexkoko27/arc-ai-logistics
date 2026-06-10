@@ -8,6 +8,10 @@ Current branch:
 
 Current checkpoint:
 
+`936e81b docs: define context governance boundaries`
+
+Previous implementation checkpoint:
+
 `504ee1d feat: show dispatcher context facts review surface`
 
 ## Purpose
